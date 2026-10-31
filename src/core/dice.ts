@@ -12,7 +12,14 @@ export const FACE_COUNT: Readonly<Record<DieShape, number>> = {
 };
 
 /** Shapes a custom die may use (the d100 ball is reserved for the standard die). */
-export const CUSTOM_SHAPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'] as const satisfies readonly DieShape[];
+export const CUSTOM_SHAPES = [
+  'd4',
+  'd6',
+  'd8',
+  'd10',
+  'd12',
+  'd20',
+] as const satisfies readonly DieShape[];
 export type CustomDieShape = (typeof CUSTOM_SHAPES)[number];
 
 /** One face of a die. `value` is set when the label is an integer, else null (symbol/text/blank). */
