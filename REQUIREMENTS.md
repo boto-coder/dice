@@ -3,20 +3,25 @@
 _Status: Draft v1 · Last updated: 2026-10-31_
 
 ## 1. Overview
+
 **Purpose:** A quick, reliable digital dice roller for use at the table: for tabletop RPG sessions, and as a stand-in when a physical die from a board game has gone missing.
 
 **Target users:**
+
 - Tabletop RPG players and GMs (e.g. D&D-style games)
 - Board gamers playing complex games who need to replace a lost die
 
 ## 2. Goals & Non-Goals
+
 ### Goals
+
 - Roll standard RPG dice with a single click
 - Recreate any lost board-game die, including symbol dice, and reuse it later
 - Satisfying 3D roll animations driven by real physics
 - Works well on both desktop and mobile browsers, including offline
 
 ### Non-Goals (out of scope for v1)
+
 - Saved group presets (e.g. "Attack: d20 + d8"), deferred to a later version
 - Dice notation input (e.g. `2d6+3`)
 - Roll modifiers
@@ -29,7 +34,9 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - Public hosting (runs locally for now)
 
 ## 3. Functional Requirements
+
 ### 3.1 Dice Types
+
 - **Standard RPG set:** d4, d6, d8, d10, d12, d20, d100.
 - **d100:** A **single ball-style die** (Zocchihedron-like): a near-spherical body with 100 faces. It rolls under physics, and the result is shown large on top once it settles.
 - **Custom-face dice** (to replace lost board-game dice):
@@ -41,6 +48,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
   - The user can create, edit, and delete custom dice.
 
 ### 3.2 Rolling
+
 - Rolling is done by **clicking/tapping buttons**.
 - **No modifiers** (+/-) in v1.
 - **Dice groups:** The user can roll several dice together as one group.
@@ -53,6 +61,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Roll again:** After a roll, a **Roll again** button re-throws the same group.
 
 ### 3.3 Results Display
+
 - Rolls are **shown graphically**: 3D dice tumble and settle, not only as numbers.
 - After the dice settle, each die's result is shown clearly, both on the die and in a results panel.
 - **Sum:** Show the total of all number dice in the group.
@@ -60,17 +69,20 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Crits:** A natural 20 or a natural 1 on a d20 gets a special visual highlight (e.g. a glow on the die and in the results panel).
 
 ### 3.4 Roll History
+
 - Show the **last 20 rolls** of the session, newest first. Each entry shows the group, the individual results, and the sum.
 - A **Clear** button empties the history.
 - History is **not persisted**; it clears on page reload.
 
 ### 3.5 Possible Future Features (not in v1)
+
 - Saved group presets
 - Advantage/disadvantage, keep highest/lowest, exploding dice
 - Sound effects
 - Persisted history
 
 ## 4. Non-Functional Requirements
+
 - **Platforms / devices:** Browser-based web app with a responsive layout for desktop and mobile. Supports current evergreen browsers (Chrome, Firefox, Safari, Edge), including mobile Safari and Chrome.
 - **Static app:** Purely static files with no server-side code.
 - **Offline / installable:** Built as a **PWA** (web manifest + service worker). After the first load it works fully offline and can be added to a phone's home screen.
@@ -84,6 +96,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Randomness:** Results come from the physics simulation. Initial throw parameters (position, velocity, spin) are randomized using `crypto.getRandomValues`. Fairness is **verified statistically** (see 6.2).
 
 ## 5. UI / UX
+
 - **Look & feel:** Clean and minimal for now; we'll revisit the visual style later.
 - **Layout:**
   - A 3D dice area (the "table") takes up most of the screen.
@@ -95,6 +108,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Sound:** None in v1.
 
 ## 6. Technical Approach
+
 - **Language / build:** TypeScript + **Vite**.
 - **Rendering:** **Three.js**.
 - **Physics:** **`cannon-es`**. Each die has a physics body matching its shape. The result is the face whose normal points most nearly straight up after settling. For the d4, the result is read from the top vertex, as on a real d4.
@@ -106,6 +120,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Hosting:** Run locally for now (`vite dev` / `vite preview`). See Open Questions.
 
 ### 6.1 Testing (full suite)
+
 - **Unit tests (Vitest):**
   - dice definitions
   - face-up detection for every die type, including d4 and d100
@@ -130,6 +145,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **CI-ready:** One command (`npm test`) runs everything. Coverage is reported, with a target of ≥ 90% on the logic modules.
 
 ## 7. Open Questions
+
 - **Hosting:** Where should it eventually be deployed (GitHub Pages, Netlify, own server, …)?
 - **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors).
 - **Theme:** Light, dark, or follow the system setting?
@@ -137,6 +153,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Fairness thresholds:** What chi-square significance level counts as a pass? (Proposed: p > 0.01.)
 
 ## 8. Milestones
+
 1. **Project setup:** Vite + TypeScript, Vitest, Playwright, linting/formatting, `npm test` script.
 2. **Core logic (no graphics):** Dice definitions, tray, results/sum/crit rules, history, and custom-dice model + validation + storage, all with unit tests.
 3. **3D foundation:** Three.js scene with a table and lighting, a `cannon-es` world, one d6 that throws, settles, and reports its face.
