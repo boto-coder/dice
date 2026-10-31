@@ -10,6 +10,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/main.ts', 'src/**/*.d.ts'],
       reporter: ['text', 'html'],
+      thresholds: {
+        'src/core/**': { lines: 90, branches: 90, functions: 90, statements: 90 },
+      },
     },
   },
 });
