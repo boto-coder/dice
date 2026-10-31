@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  secureRandom,
-  randomInt,
-  randomBetween,
-  randomId,
-  seededRng,
-} from '../../src/core/random';
+import { secureRandom, randomInt, randomBetween, randomId, seededRng } from '../../src/core/random';
 
 describe('secureRandom', () => {
   it('returns floats in [0, 1)', () => {
