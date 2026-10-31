@@ -12,9 +12,7 @@ export interface QuatLike {
 export function rotatedY(q: QuatLike, v: Vec3Tuple): number {
   // y-row of the rotation matrix built from q.
   const { x, y, z, w } = q;
-  return (
-    2 * (x * y + w * z) * v[0] + (1 - 2 * (x * x + z * z)) * v[1] + 2 * (y * z - w * x) * v[2]
-  );
+  return 2 * (x * y + w * z) * v[0] + (1 - 2 * (x * x + z * z)) * v[1] + 2 * (y * z - w * x) * v[2];
 }
 
 /** Index of the face whose outward normal points most nearly straight up. */
