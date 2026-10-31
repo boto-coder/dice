@@ -1,4 +1,10 @@
-import { CUSTOM_SHAPES, FACE_COUNT, shapeForFaceCount, type DieDefinition, type Face } from './dice';
+import {
+  CUSTOM_SHAPES,
+  FACE_COUNT,
+  shapeForFaceCount,
+  type DieDefinition,
+  type Face,
+} from './dice';
 import { randomId } from './random';
 
 export const MAX_NAME_LENGTH = 30;
@@ -23,9 +29,7 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
 /** Number of user-perceived characters in a string. */
 export function graphemeLength(s: string): number {
-  let n = 0;
-  for (const _ of segmenter.segment(s)) n++;
-  return n;
+  return Array.from(segmenter.segment(s)).length;
 }
 
 /** Turns a raw face label into a Face; integer labels become number faces. */
