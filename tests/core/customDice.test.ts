@@ -94,9 +94,7 @@ describe('validateCustomDie', () => {
 
   it('rejects a die where every face is blank', () => {
     const errors = validateCustomDie({ name: 'Blank', faces: ['', '', '', ' '] });
-    expect(errors).toEqual([
-      { field: 'faces', message: 'At least one face must have a label.' },
-    ]);
+    expect(errors).toEqual([{ field: 'faces', message: 'At least one face must have a label.' }]);
   });
 
   it('reports several problems at once', () => {
