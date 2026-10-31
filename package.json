@@ -15,7 +15,8 @@
     "test": "npm run typecheck && npm run lint && npm run format:check && npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
