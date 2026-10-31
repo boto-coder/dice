@@ -159,6 +159,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 3. **3D foundation:** Three.js scene with a table and lighting, a `cannon-es` world, one d6 that throws, settles, and reports its face.
 4. **All dice shapes:** d4, d8, d10, d12, d20, and the ball-style d100, with geometry, physics bodies, numbered face textures, and face-reading tests.
 5. **Groups and UI:** Dice buttons, tray (with the 20-dice limit), Roll / Roll again, results panel with sum, crit highlight, history panel, responsive layout.
+   - The table must grow with the group size (camera zooms out). Milestone 3 simulations showed 20 dice need roughly a 16×12 table to settle in under 4 s without piling up.
 6. **Custom dice:** Editor (create/edit/delete), runtime face textures for text and emoji, mixing custom dice into groups, persistence.
 7. **Accessibility and PWA:** ARIA live results, keyboard support, reduced motion, manifest + service worker, offline E2E test.
 8. **Fairness and performance:** Headless physics fairness harness with chi-square tests, physics tuning, mobile performance check with 20 dice.
