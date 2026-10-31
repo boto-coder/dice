@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { secureRandom, randomInt, randomBetween, randomId } from '../../src/core/random';
+import {
+  secureRandom,
+  randomInt,
+  randomBetween,
+  randomId,
+  seededRng,
+} from '../../src/core/random';
 
 describe('secureRandom', () => {
   it('returns floats in [0, 1)', () => {
@@ -67,5 +73,26 @@ describe('randomId', () => {
   it('is unique across many calls', () => {
     const ids = new Set(Array.from({ length: 1_000 }, randomId));
     expect(ids.size).toBe(1_000);
+  });
+});
+
+describe('seededRng', () => {
+  it('is deterministic for the same seed', () => {
+    const a = seededRng(42);
+    const b = seededRng(42);
+    for (let i = 0; i < 100; i++) expect(a()).toBe(b());
+  });
+
+  it('differs between seeds', () => {
+    expect(seededRng(1)()).not.toBe(seededRng(2)());
+  });
+
+  it('returns floats in [0, 1)', () => {
+    const rng = seededRng(7);
+    for (let i = 0; i < 10_000; i++) {
+      const x = rng();
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThan(1);
+    }
   });
 });
