@@ -28,15 +28,7 @@ const combatDie: DieDefinition = {
 
 describe('standard dice', () => {
   it('provides exactly the RPG set', () => {
-    expect(STANDARD_DICE.map((d) => d.id)).toEqual([
-      'd4',
-      'd6',
-      'd8',
-      'd10',
-      'd12',
-      'd20',
-      'd100',
-    ]);
+    expect(STANDARD_DICE.map((d) => d.id)).toEqual(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']);
   });
 
   it.each(SHAPES)('%s has faces numbered 1..N', (shape) => {
