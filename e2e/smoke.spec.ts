@@ -24,6 +24,24 @@ test('rolls a 3D d6 and shows the result', async ({ page }) => {
   });
 });
 
+test('rolls every die shape at once and shows a valid result for each', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Roll all' }).click();
+  const status = page.getByRole('status');
+  await expect(status).toHaveText(/Total: \d+\.$/, { timeout: 15_000 });
+  const text = (await status.textContent())!;
+  const values: Record<string, number> = Object.fromEntries(
+    [...text.matchAll(/(d\d+): (\d+)/g)].map((m) => [m[1], Number(m[2])]),
+  );
+  const sides = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
+  for (const [die, max] of Object.entries(sides)) {
+    expect(values[die]).toBeGreaterThanOrEqual(1);
+    expect(values[die]).toBeLessThanOrEqual(max);
+  }
+  const total = Object.values(values).reduce((a, b) => a + b, 0);
+  expect(text).toContain(`Total: ${total}.`);
+});
+
 test('has no automatically detectable accessibility violations', async ({ page }) => {
   await page.goto('/');
   const results = await new AxeBuilder({ page }).analyze();
