@@ -1,15 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import * as CANNON from 'cannon-es';
 import { rotatedY, topFaceIndex } from '../../src/physics/faceReading';
-import { faceNormals, polyhedronFor, type Vec3Tuple } from '../../src/physics/polyhedra';
+import {
+  faceNormals,
+  polyhedronFor,
+  readVectors,
+  type Vec3Tuple,
+} from '../../src/physics/polyhedra';
+import { SHAPES } from '../../src/core/dice';
 
-const normals = faceNormals(polyhedronFor('d6'));
-// Logical d6 face directions (see polyhedra.ts): 1:+z 2:+y 3:+x 4:-x 5:-y 6:-z
-const VALUE_BY_INDEX = [1, 2, 3, 4, 5, 6];
-
-function quat(axis: [number, number, number], angle: number): CANNON.Quaternion {
+/** Rotation that turns local direction `from` to point straight up (+y). */
+function rotationPointingUp(from: Vec3Tuple): CANNON.Quaternion {
   const q = new CANNON.Quaternion();
-  q.setFromAxisAngle(new CANNON.Vec3(...axis), angle);
+  q.setFromVectors(new CANNON.Vec3(...from), new CANNON.Vec3(0, 1, 0));
   return q;
 }
 
@@ -28,23 +31,37 @@ describe('rotatedY', () => {
   });
 });
 
-describe('topFaceIndex on a d6', () => {
-  it.each<[string, CANNON.Quaternion, number]>([
-    ['identity', new CANNON.Quaternion(), 2],
-    ['+90° about x (+z face up)', quat([1, 0, 0], -Math.PI / 2), 1],
-    ['-90° about x (-z face up)', quat([1, 0, 0], Math.PI / 2), 6],
-    ['+90° about z (+x face up)', quat([0, 0, 1], Math.PI / 2), 3],
-    ['-90° about z (-x face up)', quat([0, 0, 1], -Math.PI / 2), 4],
-    ['180° about x (upside down)', quat([1, 0, 0], Math.PI), 5],
-  ])('%s shows %i', (_, q, value) => {
-    expect(VALUE_BY_INDEX[topFaceIndex(normals, q)]).toBe(value);
+describe('topFaceIndex', () => {
+  it.each(SHAPES)('reads every result of a %s when it is turned to the top', (shape) => {
+    const vectors = readVectors(polyhedronFor(shape));
+    vectors.forEach((v, i) => {
+      expect(topFaceIndex(vectors, rotationPointingUp(v))).toBe(i);
+    });
   });
 
-  it('picks the closest face when the die is tilted', () => {
-    // Tilted 30° toward +x from flat: +y face is still closest to up.
-    expect(VALUE_BY_INDEX[topFaceIndex(normals, quat([0, 0, 1], Math.PI / 6))]).toBe(2);
-    // Tilted 60°: now +x face is closer to up.
-    expect(VALUE_BY_INDEX[topFaceIndex(normals, quat([0, 0, 1], Math.PI / 3))]).toBe(3);
+  it('reads a d4 by its top corner, which is opposite the face it rests on', () => {
+    const d4 = polyhedronFor('d4');
+    const vectors = readVectors(d4);
+    const normals = faceNormals(d4);
+    d4.faces.forEach((face, f) => {
+      // Rest on face f: its normal points down.
+      const down = rotationPointingUp([-normals[f]![0], -normals[f]![1], -normals[f]![2]]);
+      const top = topFaceIndex(vectors, down);
+      expect(face).not.toContain(top); // the top corner is the one not on the bottom face
+    });
+  });
+
+  it('picks the closest face when a d6 is tilted', () => {
+    const d6 = polyhedronFor('d6');
+    const normals = faceNormals(d6);
+    const flat = rotationPointingUp(normals[0]!);
+    const tilt = (deg: number) => {
+      const t = new CANNON.Quaternion();
+      t.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), (deg * Math.PI) / 180);
+      return t.mult(flat);
+    };
+    expect(topFaceIndex(normals, tilt(30))).toBe(0);
+    expect(topFaceIndex(normals, tilt(60))).not.toBe(0);
   });
 
   it('returns -1 for a shape with no faces', () => {
