@@ -2,7 +2,13 @@ import * as CANNON from 'cannon-es';
 import type { DieShape } from '../core/dice';
 import { randomBetween, secureRandom, type Rng } from '../core/random';
 import { rotatedY, topFaceIndex } from './faceReading';
-import { faceNormals, polyhedronFor, type PolyhedronData, type Vec3Tuple } from './polyhedra';
+import {
+  faceNormals,
+  polyhedronFor,
+  readVectors,
+  type PolyhedronData,
+  type Vec3Tuple,
+} from './polyhedra';
 
 /** Half-size of the rectangular play area on the floor (world units). */
 export interface Arena {
@@ -42,7 +48,10 @@ export interface PhysicsDie {
   readonly shape: DieShape;
   readonly body: CANNON.Body;
   readonly data: PolyhedronData;
+  /** Outward face normals (for flatness checks). */
   readonly normals: readonly Vec3Tuple[];
+  /** Directions that decide the result: face normals, or corner directions for a d4. */
+  readonly readVectors: readonly Vec3Tuple[];
 }
 
 function toConvex(data: PolyhedronData): CANNON.ConvexPolyhedron {
@@ -166,7 +175,7 @@ export class DiceWorld {
         linearDamping: PHYSICS.linearDamping,
       });
       this.world.addBody(body);
-      return { shape, body, data, normals: faceNormals(data) };
+      return { shape, body, data, normals: faceNormals(data), readVectors: readVectors(data) };
     });
     return this._dice;
   }
@@ -179,7 +188,8 @@ export class DiceWorld {
   throwDice(rng: Rng = secureRandom): void {
     this.rng = rng;
     const { halfWidth: hw, halfDepth: hd } = this._arena;
-    const spacing = 1.3;
+    // Spread starting positions by the largest die so none overlap.
+    const spacing = 2 * Math.max(0.5, ...this._dice.map((d) => d.data.radius)) + 0.15;
     const perColumn = Math.max(1, Math.floor((hd * 1.6) / spacing) + 1);
     const perLayer = perColumn * 2;
     this._dice.forEach((d, i) => {
@@ -223,9 +233,13 @@ export class DiceWorld {
     return this._dice.every((d) => d.body.sleepState === CANNON.Body.SLEEPING);
   }
 
-  /** How upright the most upward face is: 1 = lying perfectly flat. */
+  /**
+   * How flat the die lies: 1 = some face points straight down onto the table.
+   * (Uses the bottom face, which works for every shape, including a d4 that
+   * has no face pointing up.)
+   */
   flatness(die: PhysicsDie): number {
-    return Math.max(...die.normals.map((n) => rotatedY(die.body.quaternion, n)));
+    return Math.max(...die.normals.map((n) => -rotatedY(die.body.quaternion, n)));
   }
 
   isCocked(die: PhysicsDie): boolean {
@@ -274,9 +288,9 @@ export class DiceWorld {
     }
   }
 
-  /** Logical face index showing on top of each die, in die order. */
+  /** Logical result index of each die (top face, or top corner for a d4), in die order. */
   readResults(): number[] {
-    return this._dice.map((d) => topFaceIndex(d.normals, d.body.quaternion));
+    return this._dice.map((d) => topFaceIndex(d.readVectors, d.body.quaternion));
   }
 
   /**
