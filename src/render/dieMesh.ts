@@ -1,48 +1,47 @@
 import * as THREE from 'three';
 import type { DieDefinition } from '../core/dice';
 import { faceNormal, type PolyhedronData } from '../physics/polyhedra';
-import { faceTexture } from './faceTexture';
-import { faceUVs } from './faceUV';
+import { dieAtlas } from './faceTexture';
+import { atlasUV } from './faceUV';
 
 /**
- * Builds a die mesh: one material group per logical face, each textured with
- * that face's label, so face i on the mesh is face i in the physics body.
+ * Builds a die mesh whose face i matches face i of the physics body, textured
+ * from one atlas holding all of the die's labels.
  */
 export function createDieMesh(die: DieDefinition, data: PolyhedronData): THREE.Group {
+  const atlas = dieAtlas(die, data);
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
-  const geometry = new THREE.BufferGeometry();
 
   data.faces.forEach((face, fi) => {
     const points = face.map((vi) => data.vertices[vi]!);
     const n = faceNormal(data, fi);
-    const faceUv = faceUVs(points, n);
-    const start = positions.length / 3;
+    const faceUv = atlas.faceUVs[fi]!;
     // Fan-triangulate the convex polygon.
     for (let k = 1; k < points.length - 1; k++) {
       for (const idx of [0, k, k + 1]) {
         positions.push(...points[idx]!);
         normals.push(...n);
-        uvs.push(...faceUv[idx]!);
+        uvs.push(...atlasUV(atlas.layout, fi, faceUv[idx]!));
       }
     }
-    geometry.addGroup(start, positions.length / 3 - start, fi);
   });
 
+  const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
 
-  const materials = die.faces.map(
-    (f) => new THREE.MeshStandardMaterial({ map: faceTexture(f.label), roughness: 0.55 }),
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({ map: atlas.texture, roughness: 0.55 }),
   );
-  const mesh = new THREE.Mesh(geometry, materials);
   mesh.castShadow = true;
 
   const edges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geometry),
-    new THREE.LineBasicMaterial({ color: 0x9aa0a6 }),
+    new THREE.EdgesGeometry(geometry, 1),
+    new THREE.LineBasicMaterial({ color: die.shape === 'd100' ? 0xc4c8cd : 0x9aa0a6 }),
   );
 
   const group = new THREE.Group();
@@ -50,7 +49,7 @@ export function createDieMesh(die: DieDefinition, data: PolyhedronData): THREE.G
   return group;
 }
 
-/** Frees GPU resources of a die mesh (face textures are cached and kept). */
+/** Frees GPU resources of a die mesh (atlas textures are cached and kept). */
 export function disposeDieMesh(group: THREE.Group): void {
   group.traverse((obj) => {
     if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
