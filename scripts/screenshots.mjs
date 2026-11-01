@@ -39,7 +39,7 @@ for (const { name, context } of targets) {
     timeout: 15_000,
   });
   const history = page.locator('details.history');
-  if (!(await history.getAttribute('open'))) await history.locator('summary').click();
+  if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
   await page.screenshot({ path: file('4-result'), fullPage: true });
   console.log(`${name}: ${await page.getByRole('status').textContent()}`);
 }
