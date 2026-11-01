@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { DieDefinition } from '../core/dice';
+import type { Crit } from '../core/results';
 import { faceNormal, type PolyhedronData } from '../physics/polyhedra';
 import { dieAtlas } from './faceTexture';
 import { atlasUV } from './faceUV';
@@ -47,6 +48,22 @@ export function createDieMesh(die: DieDefinition, data: PolyhedronData): THREE.G
   const group = new THREE.Group();
   group.add(mesh, edges);
   return group;
+}
+
+/** Glow colours for highlighted dice: natural 20 (success) and natural 1 (failure). */
+export const GLOW: Readonly<Record<NonNullable<Crit>, number>> = {
+  success: 0x1a7f37,
+  failure: 0xcf222e,
+};
+
+/** Tints a die (and its edges) to mark a critical result, or clears the tint. */
+export function setGlow(group: THREE.Group, crit: Crit): void {
+  group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshStandardMaterial) {
+      obj.material.emissive.setHex(crit ? GLOW[crit] : 0x000000);
+      obj.material.emissiveIntensity = crit ? 0.45 : 0;
+    }
+  });
 }
 
 /** Frees GPU resources of a die mesh (atlas textures are cached and kept). */
