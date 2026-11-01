@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as CANNON from 'cannon-es';
-import { DiceWorld, PHYSICS, randomQuaternion } from '../../src/physics/world';
+import { DiceWorld, PHYSICS, randomQuaternion, type PhysicsDie } from '../../src/physics/world';
 import { seededRng } from '../../src/core/random';
 import { SHAPES } from '../../src/core/dice';
 import { resultCount } from '../../src/physics/polyhedra';
@@ -164,6 +164,34 @@ describe('DiceWorld', () => {
     }
     tilt();
     expect(w.advance(PHYSICS.timeStep)).toBe(true);
+  });
+
+  it('nudges each cocked die on its own, without waiting for the others', () => {
+    const w = new DiceWorld(arena);
+    w.setDice(['d6', 'd6']);
+    w.throwDice(seededRng(5));
+    const [cocked, moving] = w.dice as [PhysicsDie, PhysicsDie];
+    cocked.body.position.set(-2, 0.7, 0);
+    cocked.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), Math.PI / 4);
+    cocked.body.velocity.setZero();
+    cocked.body.angularVelocity.setZero();
+    cocked.body.sleep();
+    moving.body.position.set(2, 3, 0);
+    moving.body.velocity.set(0, -5, 0);
+
+    expect(w.advance(PHYSICS.timeStep)).toBe(false);
+    expect(cocked.body.velocity.y).toBeGreaterThan(0); // hopped already
+    expect(moving.body.sleepState).not.toBe(CANNON.Body.SLEEPING);
+  });
+
+  it('caps throw speed on a very large table', () => {
+    const w = new DiceWorld({ halfWidth: 40, halfDepth: 30 });
+    w.setDice(Array.from({ length: 10 }, () => 'd6' as const));
+    w.throwDice(seededRng(2));
+    for (const d of w.dice) {
+      const horizontal = Math.hypot(d.body.velocity.x, d.body.velocity.z);
+      expect(horizontal).toBeLessThanOrEqual(1.5 + 0.5 * PHYSICS.maxThrowReach * 2 + 1e-9);
+    }
   });
 
   it('starts mixed dice far enough apart that none overlap', () => {
