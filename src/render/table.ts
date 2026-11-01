@@ -40,7 +40,7 @@ export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.className = 'table__canvas';
   container.append(renderer.domElement);
 
