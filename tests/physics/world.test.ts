@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import * as CANNON from 'cannon-es';
 import { DiceWorld, PHYSICS, randomQuaternion } from '../../src/physics/world';
 import { seededRng } from '../../src/core/random';
+import { SHAPES } from '../../src/core/dice';
+import { resultCount } from '../../src/physics/polyhedra';
 
 const arena = { halfWidth: 5, halfDepth: 4 };
 
@@ -162,5 +164,73 @@ describe('DiceWorld', () => {
     }
     tilt();
     expect(w.advance(PHYSICS.timeStep)).toBe(true);
+  });
+
+  it('starts mixed dice far enough apart that none overlap', () => {
+    const w = new DiceWorld({ halfWidth: 8, halfDepth: 6 });
+    w.setDice(['d100', 'd4', 'd100', 'd20', 'd100', 'd6', 'd100', 'd10']);
+    w.throwDice(seededRng(1));
+    const dice = w.dice;
+    for (let i = 0; i < dice.length; i++) {
+      for (let j = i + 1; j < dice.length; j++) {
+        const gap = dice[i]!.body.position.distanceTo(dice[j]!.body.position);
+        expect(gap).toBeGreaterThan(dice[i]!.data.radius + dice[j]!.data.radius);
+      }
+    }
+  });
+
+  it('settles a mixed group of every shape', () => {
+    const w = new DiceWorld({ halfWidth: 7, halfDepth: 5 });
+    w.setDice(SHAPES);
+    const { faces, timedOut } = w.simulateThrow(seededRng(21));
+    expect(timedOut).toBe(false);
+    faces.forEach((f, i) => {
+      expect(f).toBeGreaterThanOrEqual(0);
+      expect(f).toBeLessThan(resultCount(w.dice[i]!.data));
+    });
+  });
+});
+
+describe.each(SHAPES)('throwing a %s', (shape) => {
+  const throws = shape === 'd100' ? 150 : 120;
+
+  it('always settles flat, quickly, inside the arena', () => {
+    const w = new DiceWorld(arena);
+    w.setDice([shape]);
+    const die = w.dice[0]!;
+    const rng = seededRng(shape.length * 1000 + 7);
+    let total = 0;
+    for (let i = 0; i < throws; i++) {
+      const r = w.simulateThrow(rng);
+      expect(r.timedOut).toBe(false);
+      expect(w.isCocked(die)).toBe(false);
+      expect(Math.abs(die.body.position.x)).toBeLessThan(arena.halfWidth);
+      expect(Math.abs(die.body.position.z)).toBeLessThan(arena.halfDepth);
+      total += r.seconds;
+    }
+    expect(total / throws).toBeLessThan(2.5);
+  });
+
+  it('can show many different results (smoke check; fairness is tested separately)', () => {
+    const w = new DiceWorld(arena);
+    w.setDice([shape]);
+    const n = resultCount(w.dice[0]!.data);
+    const rng = seededRng(99);
+    const seen = new Set<number>();
+    for (let i = 0; i < throws; i++) seen.add(w.simulateThrow(rng).faces[0]!);
+    // Small dice should show every face; the d100 at least most of its faces.
+    expect(seen.size).toBeGreaterThanOrEqual(shape === 'd100' ? 70 : n);
+  });
+});
+
+describe('d4 flatness', () => {
+  it('counts a d4 resting on a face as flat even though no face points up', () => {
+    const w = new DiceWorld(arena);
+    w.setDice(['d4']);
+    const die = w.dice[0]!;
+    const n = die.normals[0]!;
+    die.body.quaternion.setFromVectors(new CANNON.Vec3(...n), new CANNON.Vec3(0, -1, 0));
+    expect(w.flatness(die)).toBeCloseTo(1, 9);
+    expect(w.isCocked(die)).toBe(false);
   });
 });
