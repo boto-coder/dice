@@ -1,11 +1,14 @@
 // Captures milestone screenshots of the running app (desktop + mobile).
-// Usage: node scripts/screenshots.mjs <label> [baseUrl]
-//   e.g. node scripts/screenshots.mjs m3 http://127.0.0.1:5173
+// Usage: node scripts/screenshots.mjs <label> [baseUrl] [buttonName]
+//   e.g. node scripts/screenshots.mjs m4 http://127.0.0.1:9119 "Roll all"
+// buttonName is the exact accessible name of the button to click
+// (default: the first button whose name starts with "Roll").
 import { chromium, devices } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
 const label = process.argv[2] ?? 'snapshot';
 const baseUrl = process.argv[3] ?? 'http://127.0.0.1:5173';
+const buttonName = process.argv[4] ? { name: process.argv[4], exact: true } : { name: /^Roll/ };
 const outDir = new URL('../docs/screenshots/', import.meta.url);
 await mkdir(outDir, { recursive: true });
 
@@ -23,7 +26,7 @@ for (const { name, context } of targets) {
 
   await page.screenshot({ path: file('1-initial') });
 
-  const roll = page.getByRole('button', { name: /^Roll/ });
+  const roll = page.getByRole('button', buttonName).first();
   await roll.click();
   await page.waitForTimeout(250);
   await page.screenshot({ path: file('2-rolling') });
