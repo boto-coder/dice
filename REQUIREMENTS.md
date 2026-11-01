@@ -38,7 +38,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 ### 3.1 Dice Types
 
 - **Standard RPG set:** d4, d6, d8, d10, d12, d20, d100.
-- **d100:** A **single ball-style die** (Zocchihedron-like): a near-spherical body with 100 faces. It rolls under physics, and the result is shown large on top once it settles.
+- **d100:** A **single ball-style die** (Zocchihedron-like): a near-spherical body with 100 faces. It rolls under physics; its result is read from the results panel (decided after milestone 4: no extra label on the die).
 - **Custom-face dice** (to replace lost board-game dice):
   - Custom dice use **standard shapes only**: they must have 4, 6, 8, 10, 12, or 20 faces, and the matching polyhedron is used.
   - The user creates a die by listing its faces. A face can be a number, text, or emoji/symbol (e.g. `⚔️, ⚔️, 🛡️, 🛡️, 💀, blank`).
@@ -149,7 +149,6 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Hosting:** Where should it eventually be deployed (GitHub Pages, Netlify, own server, …)?
 - **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors).
 - **Theme:** Light, dark, or follow the system setting?
-- **d100 readability:** Check whether 100 faces are readable on small screens. If not, show only the result number on top instead of every face label.
 - **Fairness thresholds:** What chi-square significance level counts as a pass? (Proposed: p > 0.01.)
 
 ## 8. Milestones
@@ -163,4 +162,5 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 6. **Custom dice:** Editor (create/edit/delete), runtime face textures for text and emoji, mixing custom dice into groups, persistence.
 7. **Accessibility and PWA:** ARIA live results, keyboard support, reduced motion, manifest + service worker, offline E2E test.
 8. **Fairness and performance:** Headless physics fairness harness with chi-square tests, physics tuning, mobile performance check with 20 dice.
+   - Milestone 5 notes: with 20 mixed dice, the average settle time is about 3.5 s (target: about 3 s), with an occasional 5 s timeout. On a big table the dice gather on the left half, because the throw speed is capped.
 9. **Review:** Full test pass and a walkthrough with you, then revisit visual style and the open questions.
