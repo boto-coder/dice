@@ -42,6 +42,8 @@ export const PHYSICS = {
    */
   flatThreshold: 0.95,
   maxNudges: 3,
+  /** Throw speed grows with distance to the target, up to this distance. */
+  maxThrowReach: 8,
 } as const;
 
 export interface PhysicsDie {
@@ -86,6 +88,7 @@ export class DiceWorld {
   private _dice: PhysicsDie[] = [];
   private elapsed = 0;
   private nudges = 0;
+  private nudgeCounts: number[] = [];
   private rng: Rng = secureRandom;
 
   constructor(arena: Arena) {
@@ -208,7 +211,9 @@ export class DiceWorld {
       const tz = randomBetween(-hd * 0.7, hd * 0.7, rng);
       const dx = tx - b.position.x;
       const dz = tz - b.position.z;
-      const speed = 1.5 + randomBetween(0.2, 0.5, rng) * Math.hypot(dx, dz) * 2;
+      // Capped so a big (zoomed-out) table doesn't mean wilder throws.
+      const reach = Math.min(Math.hypot(dx, dz), PHYSICS.maxThrowReach);
+      const speed = 1.5 + randomBetween(0.2, 0.5, rng) * reach * 2;
       const len = Math.hypot(dx, dz) || 1;
       b.velocity.set((dx / len) * speed, randomBetween(-2, 1, rng), (dz / len) * speed);
       b.angularVelocity.set(
@@ -220,6 +225,7 @@ export class DiceWorld {
     });
     this.elapsed = 0;
     this.nudges = 0;
+    this.nudgeCounts = [];
   }
 
   /** Advances the simulation by `dt` seconds of real time. */
@@ -246,12 +252,21 @@ export class DiceWorld {
     return this.flatness(die) < PHYSICS.flatThreshold;
   }
 
-  /** Gives each cocked die a small random hop and spin so it falls flat. */
+  /**
+   * Gives each die that has come to rest cocked a small random hop and spin so
+   * it falls flat. Dice are handled one by one, as soon as each one rests, so
+   * a big group doesn't wait for every die before nudging. Returns true if any
+   * die was nudged.
+   */
   private nudgeCocked(): boolean {
-    const cocked = this._dice.filter((d) => this.isCocked(d));
-    if (cocked.length === 0 || this.nudges >= PHYSICS.maxNudges) return false;
-    this.nudges++;
-    for (const d of cocked) {
+    let nudged = false;
+    this._dice.forEach((d, i) => {
+      const count = this.nudgeCounts[i] ?? 0;
+      if (count >= PHYSICS.maxNudges) return;
+      if (d.body.sleepState !== CANNON.Body.SLEEPING || !this.isCocked(d)) return;
+      this.nudgeCounts[i] = count + 1;
+      this.nudges++;
+      nudged = true;
       const b = d.body;
       b.velocity.set(randomBetween(-2, 2, this.rng), 6, randomBetween(-2, 2, this.rng));
       b.angularVelocity.set(
@@ -260,13 +275,13 @@ export class DiceWorld {
         randomBetween(-10, 10, this.rng),
       );
       b.wakeUp();
-    }
-    return true;
+    });
+    return nudged;
   }
 
   /**
    * Advances a throw by `dt` seconds. Returns true when the throw is finished:
-   * all dice at rest (cocked ones nudged up to maxNudges times), or the
+   * all dice at rest (each cocked one nudged up to maxNudges times), or the
    * timeout passed, in which case dice are frozen in place.
    */
   advance(dt: number): boolean {
@@ -275,8 +290,8 @@ export class DiceWorld {
       this.freeze();
       return true;
     }
-    if (!this.isSettled()) return false;
-    return !this.nudgeCocked();
+    if (this.nudgeCocked()) return false;
+    return this.isSettled();
   }
 
   /** Stops all dice where they are, so what is shown matches what is read. */
