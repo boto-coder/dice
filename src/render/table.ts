@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import type { DieDefinition } from '../core/dice';
+import type { Crit } from '../core/results';
 import { secureRandom, type Rng } from '../core/random';
 import { DiceWorld, type Arena } from '../physics/world';
-import { createDieMesh, disposeDieMesh } from './dieMesh';
+import { createDieMesh, disposeDieMesh, setGlow } from './dieMesh';
 
 /** The 3D dice table as seen by the app: throw dice, get logical face indices back. */
 export interface DiceTable {
   /** Throws the dice; resolves with the face index on top of each die, in order. */
   roll(dice: readonly DieDefinition[]): Promise<number[]>;
+  /** Highlights settled dice (e.g. a natural 20 or 1), in the same order as the last roll. */
+  highlight(marks: readonly Crit[]): void;
   dispose(): void;
 }
 
@@ -17,6 +20,12 @@ export const VIEW = {
   minArenaHalf: 3.6,
   /** Keeps dice fully in view: walls sit this far inside the visible edge. */
   edgeMargin: 0.75,
+  /**
+   * Table area each die needs to settle quickly without piling up. Milestone 3
+   * simulations showed 20 dice need about a 16×12 table (9.6 units² each);
+   * milestone 5 runs with mixed shapes settled faster with a little more room.
+   */
+  areaPerDie: 12,
 } as const;
 
 /** Camera height needed so the shorter side of the view shows at least minArenaHalf. */
@@ -24,6 +33,29 @@ export function cameraHeight(aspect: number, fovDeg: number = VIEW.fov): number 
   const tanHalf = Math.tan(THREE.MathUtils.degToRad(fovDeg / 2));
   const need = VIEW.minArenaHalf + VIEW.edgeMargin;
   return need / (tanHalf * Math.min(1, aspect));
+}
+
+/**
+ * Camera height for a roll of `count` dice: the base height, raised (zooming
+ * out) until the visible arena has at least `count × areaPerDie` of floor.
+ */
+export function cameraHeightForDice(
+  aspect: number,
+  count: number,
+  fovDeg: number = VIEW.fov,
+): number {
+  const base = cameraHeight(aspect, fovDeg);
+  const area = count * VIEW.areaPerDie;
+  // Arena is (2·(x·a − m)) × (2·(x − m)) with x = height·tan(fov/2).
+  // Solve 4(a·x − m)(x − m) = area for x.
+  const a = aspect;
+  const m = VIEW.edgeMargin;
+  const qa = 4 * a;
+  const qb = -4 * m * (a + 1);
+  const qc = 4 * m * m - area;
+  const x = (-qb + Math.sqrt(qb * qb - 4 * qa * qc)) / (2 * qa);
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(fovDeg / 2));
+  return Math.max(base, x / tanHalf);
 }
 
 /** Play area that matches what a top-down camera at `height` can see. */
@@ -68,6 +100,7 @@ export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom)
   let meshes: THREE.Group[] = [];
   let pending: ((faces: number[]) => void) | null = null;
   let lastTime = 0;
+  let diceCount = 0;
 
   function resize(): void {
     const width = Math.max(1, container.clientWidth);
@@ -75,7 +108,7 @@ export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom)
     const aspect = width / height;
     renderer.setSize(width, height, false);
     camera.aspect = aspect;
-    const h = cameraHeight(aspect);
+    const h = cameraHeightForDice(aspect, diceCount);
     camera.position.set(0, h, 0);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
@@ -130,6 +163,8 @@ export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom)
         scene.remove(m);
         disposeDieMesh(m);
       }
+      diceCount = dice.length;
+      resize();
       const physicsDice = world.setDice(dice.map((d) => d.shape));
       meshes = dice.map((die, i) => createDieMesh(die, physicsDice[i]!.data));
       scene.add(...meshes);
@@ -140,6 +175,10 @@ export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom)
         pending = resolve;
         renderer.setAnimationLoop(frame);
       });
+    },
+    highlight(marks) {
+      meshes.forEach((m, i) => setGlow(m, marks[i] ?? null));
+      render();
     },
     dispose() {
       renderer.setAnimationLoop(null);
