@@ -62,8 +62,9 @@ test('builds a group in the tray, rolls it, and rolls it again', async ({ page }
 
   // Both rolls are in the history, newest first.
   const history = page.locator('details.history');
-  if (!(await history.getAttribute('open'))) await history.locator('summary').click();
+  if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
   await expect(history.locator('.history__entry')).toHaveCount(2);
+  await expect(history.locator('.history__entry').first()).toBeVisible();
   await expect(history.locator('.history__entry').first()).toContainText(`Total ${second.total}`);
 });
 
@@ -106,7 +107,7 @@ test('has no automatically detectable accessibility violations', async ({ page }
   await page.getByRole('button', { name: 'Roll', exact: true }).click();
   await rollResult(page);
   const history = page.locator('details.history');
-  if (!(await history.getAttribute('open'))) await history.locator('summary').click();
+  if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 });
