@@ -1,14 +1,14 @@
 // Captures milestone screenshots of the running app (desktop + mobile).
-// Usage: node scripts/screenshots.mjs <label> [baseUrl] [buttonName]
-//   e.g. node scripts/screenshots.mjs m4 http://127.0.0.1:9119 "Roll all"
-// buttonName is the exact accessible name of the button to click
-// (default: the first button whose name starts with "Roll").
+// Usage: node scripts/screenshots.mjs <label> [baseUrl] [dice]
+//   e.g. node scripts/screenshots.mjs m5 http://127.0.0.1:9119 d20,d6,d6,d10
+// `dice` is a comma-separated list of dice to add to the tray before rolling.
+// Steps: 1-initial, 2-tray (dice added), 3-rolling, 4-result (full page).
 import { chromium, devices } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
 const label = process.argv[2] ?? 'snapshot';
 const baseUrl = process.argv[3] ?? 'http://127.0.0.1:5173';
-const buttonName = process.argv[4] ? { name: process.argv[4], exact: true } : { name: /^Roll/ };
+const dice = (process.argv[4] ?? 'd20,d6,d6').split(',').filter(Boolean);
 const outDir = new URL('../docs/screenshots/', import.meta.url);
 await mkdir(outDir, { recursive: true });
 
@@ -26,17 +26,21 @@ for (const { name, context } of targets) {
 
   await page.screenshot({ path: file('1-initial') });
 
-  const roll = page.getByRole('button', buttonName).first();
-  await roll.click();
-  await page.waitForTimeout(250);
-  await page.screenshot({ path: file('2-rolling') });
+  for (const die of dice) {
+    await page.getByRole('button', { name: `Add ${die} to tray` }).click();
+  }
+  await page.screenshot({ path: file('2-tray') });
 
-  await page
-    .getByRole('status')
-    .filter({ hasText: /Total|:/ })
-    .waitFor({ timeout: 10_000 });
-  await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
-  await page.screenshot({ path: file('3-result') });
+  await page.getByRole('button', { name: 'Roll', exact: true }).click();
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: file('3-rolling') });
+
+  await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+    timeout: 15_000,
+  });
+  const history = page.locator('details.history');
+  if (!(await history.getAttribute('open'))) await history.locator('summary').click();
+  await page.screenshot({ path: file('4-result'), fullPage: true });
   console.log(`${name}: ${await page.getByRole('status').textContent()}`);
 }
 
