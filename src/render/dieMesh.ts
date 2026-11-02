@@ -40,15 +40,12 @@ export function createDieMesh(
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
 
-  const mesh = new THREE.Mesh(
-    geometry,
-    new THREE.MeshStandardMaterial({ map: atlas.texture, roughness: 0.55 }),
-  );
+  const mesh = new THREE.Mesh(geometry, dieMaterial(atlas.texture, null));
   mesh.castShadow = true;
 
   const edges = new THREE.LineSegments(
     new THREE.EdgesGeometry(geometry, 1),
-    new THREE.LineBasicMaterial({ color: die.shape === 'd100' ? 0xc4c8cd : 0x9aa0a6 }),
+    lineMaterial(die.shape === 'd100' ? 0xc4c8cd : 0x9aa0a6),
   );
 
   const group = new THREE.Group();
@@ -62,23 +59,47 @@ export const GLOW: Readonly<Record<NonNullable<Crit>, number>> = {
   failure: 0xcf222e,
 };
 
-/** Tints a die (and its edges) to mark a critical result, or clears the tint. */
+// Materials are cached and never disposed: disposing them would free their
+// shader programs, and recompiling those on every roll stalls the first frame.
+const dieMaterials = new Map<string, THREE.MeshStandardMaterial>();
+const lineMaterials = new Map<number, THREE.LineBasicMaterial>();
+
+/** The (shared) material for a label texture, plain or glowing for a crit. */
+export function dieMaterial(texture: THREE.Texture, crit: Crit): THREE.MeshStandardMaterial {
+  const key = `${texture.uuid}|${crit ?? ''}`;
+  let material = dieMaterials.get(key);
+  if (!material) {
+    material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.55 });
+    if (crit) {
+      material.emissive.setHex(GLOW[crit]);
+      material.emissiveIntensity = 0.45;
+    }
+    dieMaterials.set(key, material);
+  }
+  return material;
+}
+
+function lineMaterial(color: number): THREE.LineBasicMaterial {
+  let material = lineMaterials.get(color);
+  if (!material) {
+    material = new THREE.LineBasicMaterial({ color });
+    lineMaterials.set(color, material);
+  }
+  return material;
+}
+
+/** Tints a die to mark a critical result, or clears the tint. */
 export function setGlow(group: THREE.Group, crit: Crit): void {
   group.traverse((obj) => {
     if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshStandardMaterial) {
-      obj.material.emissive.setHex(crit ? GLOW[crit] : 0x000000);
-      obj.material.emissiveIntensity = crit ? 0.45 : 0;
+      obj.material = dieMaterial(obj.material.map!, crit);
     }
   });
 }
 
-/** Frees GPU resources of a die mesh (atlas textures are cached and kept). */
+/** Frees a die mesh's geometry (cached textures and materials are kept). */
 export function disposeDieMesh(group: THREE.Group): void {
   group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
-      obj.geometry.dispose();
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (const m of mats) m.dispose();
-    }
+    if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) obj.geometry.dispose();
   });
 }
