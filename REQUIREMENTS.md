@@ -39,6 +39,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 
 - **Standard RPG set:** d4, d6, d8, d10, d12, d20, d100.
 - **d100:** A **single ball-style die** (Zocchihedron-like): a near-spherical body with 100 faces. It rolls under physics; its result is read from the results panel (decided after milestone 4: no extra label on the die).
+  - A 100-face ball cannot have identical faces, and milestone 8 tests showed some faces land more often (as with physical ball dice). So the numbers are shuffled onto the faces before every throw: physics decides which face lands on top, and every number is exactly equally likely.
 - **Custom-face dice** (to replace lost board-game dice):
   - Custom dice use **standard shapes only**: they must have 4, 6, 8, 10, 12, or 20 faces, and the matching polyhedron is used.
   - The user creates a die by listing its faces. A face can be a number, text, or emoji/symbol (e.g. `⚔️, ⚔️, 🛡️, 🛡️, 💀, blank`).
@@ -93,7 +94,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
   - Controls have accessible labels (e.g. "Add d20 to tray").
   - Sufficient color contrast.
   - Respects `prefers-reduced-motion` with a shortened or simplified roll animation.
-- **Randomness:** Results come from the physics simulation. Initial throw parameters (position, velocity, spin) are randomized using `crypto.getRandomValues`. Fairness is **verified statistically** (see 6.2).
+- **Randomness:** Results come from the physics simulation. Initial throw parameters (position, velocity, spin) are randomized using `crypto.getRandomValues`. Fairness is **verified statistically** (see 6.1): a chi-square test per die passes at p > 0.01.
 
 ## 5. UI / UX
 
@@ -149,7 +150,6 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Hosting:** Where should it eventually be deployed (GitHub Pages, Netlify, own server, …)?
 - **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors).
 - **Theme:** Light, dark, or follow the system setting?
-- **Fairness thresholds:** What chi-square significance level counts as a pass? (Proposed: p > 0.01.)
 
 ## 8. Milestones
 
@@ -162,5 +162,5 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 6. **Custom dice:** Editor (create/edit/delete), runtime face textures for text and emoji, mixing custom dice into groups, persistence.
 7. **Accessibility and PWA:** ARIA live results, keyboard support, reduced motion, manifest + service worker, offline E2E test.
 8. **Fairness and performance:** Headless physics fairness harness with chi-square tests, physics tuning, mobile performance check with 20 dice.
-   - Milestone 5 notes: with 20 mixed dice, the average settle time is about 3.5 s (target: about 3 s), with an occasional 5 s timeout. On a big table the dice gather on the left half, because the throw speed is capped.
+   - Done: see [docs/fairness-report.md](docs/fairness-report.md) and [docs/performance.md](docs/performance.md). Dice now start spread over the whole table (20 dice settle in about 2.5 s), the d100 uses a ball shape against other dice for speed, and its numbers are shuffled onto its faces before every throw for fairness.
 9. **Review:** Full test pass and a walkthrough with you, then revisit visual style and the open questions.
