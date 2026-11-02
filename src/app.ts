@@ -13,15 +13,20 @@ import {
   addToTray,
   describeTray,
   isTrayFull,
+  pruneTray,
   removeFromTray,
   type Tray,
 } from './core/tray';
+import { loadCustomDice, saveCustomDice } from './core/storage';
 import type { DiceTable } from './render/table';
-import { renderHistory, renderResults, renderTray } from './ui/views';
+import { createCustomDiceManager } from './ui/customDiceManager';
+import { el, renderHistory, renderResults, renderTray } from './ui/views';
 
 export interface AppDeps {
   /** Creates the 3D table inside the given element. May throw if WebGL is unavailable. */
   createTable: (container: HTMLElement) => DiceTable;
+  /** Where custom dice are saved (localStorage in the browser). Omit for no persistence. */
+  storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
 }
 
 export interface AppHandle {
@@ -30,6 +35,8 @@ export interface AppHandle {
 
 const ROLL_ERROR = 'Something went wrong while rolling. Please try again.';
 const NO_WEBGL = 'Your browser cannot show 3D graphics (WebGL is unavailable).';
+const SAVE_FAILED =
+  'Your custom dice could not be saved in this browser. They will be lost when you leave the page.';
 
 /**
  * Marks a button as unavailable with aria-disabled rather than `disabled`, so
@@ -63,6 +70,14 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
             `<button type="button" class="btn btn--die" data-add="${d.id}" aria-label="Add ${d.name} to tray">${d.name}</button>`,
         ).join('')}
       </div>
+      <section class="custom" aria-labelledby="custom-title">
+        <div class="custom__header">
+          <h2 class="custom__title" id="custom-title">Custom dice</h2>
+          <button type="button" class="btn btn--small" data-action="manage">Manage</button>
+        </div>
+        <div class="custom__bar" role="group" aria-label="Add custom dice"></div>
+        <p class="custom__empty">None yet. Use Manage to recreate a lost board-game die.</p>
+      </section>
       <section class="tray" aria-labelledby="tray-title">
         <div class="tray__header">
           <h2 class="tray__title" id="tray-title">Tray</h2>
@@ -104,13 +119,18 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
   const historyCount = q<HTMLElement>('.history__count');
   const historyEmpty = q<HTMLElement>('.history__empty');
   const clearHistoryButton = q<HTMLButtonElement>('[data-action="clear-history"]');
+  const customBar = q<HTMLElement>('.custom__bar');
+  const customEmpty = q<HTMLElement>('.custom__empty');
+  const manageButton = q<HTMLButtonElement>('[data-action="manage"]');
 
   // Open history by default where there is room for it next to the table.
   if (typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 900px)').matches) {
     historyEl.open = true;
   }
 
-  const lookup = (id: string): DieDefinition | undefined => findDie(id);
+  const loaded = deps.storage ? loadCustomDice(deps.storage) : { dice: [], warnings: [] };
+  let customDice: DieDefinition[] = loaded.dice;
+  const lookup = (id: string): DieDefinition | undefined => findDie(id, customDice);
 
   let tray: Tray = EMPTY_TRAY;
   let lastGroup: Tray | null = null;
@@ -125,9 +145,14 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
     tableEl.textContent = NO_WEBGL;
   }
 
+  function customAddButtons(): HTMLButtonElement[] {
+    return [...customBar.querySelectorAll<HTMLButtonElement>('[data-add]')];
+  }
+
   function updateControls(): void {
     const full = isTrayFull(tray);
-    for (const b of addButtons) setAvailable(b, table !== null && !full);
+    for (const b of [...addButtons, ...customAddButtons()])
+      setAvailable(b, table !== null && !full);
     setAvailable(clearTrayButton, tray.length > 0);
     setAvailable(rollButton, table !== null && !rolling && tray.length > 0);
     setAvailable(againButton, table !== null && !rolling && lastGroup !== null);
@@ -150,6 +175,47 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
     historyEmpty.hidden = history.length > 0;
     updateControls();
   }
+
+  function renderCustomBar(): void {
+    customBar.replaceChildren(
+      ...customDice.map((die) => {
+        const b = el('button', 'btn btn--custom', die.name);
+        b.type = 'button';
+        b.dataset.add = die.id;
+        b.setAttribute('aria-label', `Add ${die.name} to tray`);
+        return b;
+      }),
+    );
+    customEmpty.hidden = customDice.length > 0;
+  }
+
+  /** Saves custom dice and refreshes everything that shows them. */
+  function customDiceChanged(): void {
+    if (deps.storage && !saveCustomDice(deps.storage, customDice)) manager.setNotice(SAVE_FAILED);
+    tray = pruneTray(tray, (id) => lookup(id) !== undefined);
+    if (lastGroup) {
+      lastGroup = pruneTray(lastGroup, (id) => lookup(id) !== undefined);
+      if (lastGroup.length === 0) lastGroup = null;
+    }
+    renderCustomBar();
+    updateTray();
+  }
+
+  const manager = createCustomDiceManager(root.querySelector('main')!, {
+    getDice: () => customDice,
+    onSave(die) {
+      const index = customDice.findIndex((d) => d.id === die.id);
+      customDice =
+        index >= 0 ? customDice.map((d, i) => (i === index ? die : d)) : [...customDice, die];
+      customDiceChanged();
+    },
+    onDelete(id) {
+      customDice = customDice.filter((d) => d.id !== id);
+      customDiceChanged();
+    },
+  });
+  if (loaded.warnings.length > 0) manager.setNotice(loaded.warnings.join(' '));
+  else if (deps.storage === null) manager.setNotice(SAVE_FAILED);
 
   function showResult(result: RollResult | null): void {
     renderResults(resultsBody, result);
@@ -190,6 +256,15 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
     });
   }
 
+  customBar.addEventListener('click', (event) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>('button[data-add]');
+    if (!button || !isAvailable(button)) return;
+    tray = addToTray(tray, button.dataset.add!);
+    updateTray();
+  });
+
+  manageButton.addEventListener('click', () => manager.open());
+
   trayList.addEventListener('click', (event) => {
     const chip = (event.target as Element).closest<HTMLButtonElement>('button[data-uid]');
     if (!chip) return;
@@ -222,6 +297,7 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
   });
 
   showResult(null);
+  renderCustomBar();
   updateTray();
   updateHistory();
 
