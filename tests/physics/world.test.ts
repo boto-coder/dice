@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import * as CANNON from 'cannon-es';
-import { DiceWorld, PHYSICS, randomQuaternion, type PhysicsDie } from '../../src/physics/world';
+import {
+  COLLISION,
+  DiceWorld,
+  PHYSICS,
+  ballRadius,
+  randomQuaternion,
+  shuffled,
+  type PhysicsDie,
+} from '../../src/physics/world';
 import { seededRng } from '../../src/core/random';
 import { SHAPES } from '../../src/core/dice';
 import { resultCount } from '../../src/physics/polyhedra';
@@ -184,14 +192,102 @@ describe('DiceWorld', () => {
     expect(moving.body.sleepState).not.toBe(CANNON.Body.SLEEPING);
   });
 
-  it('caps throw speed on a very large table', () => {
+  it('throws within the speed range, all dice in roughly one direction', () => {
     const w = new DiceWorld({ halfWidth: 40, halfDepth: 30 });
     w.setDice(Array.from({ length: 10 }, () => 'd6' as const));
     w.throwDice(seededRng(2));
-    for (const d of w.dice) {
-      const horizontal = Math.hypot(d.body.velocity.x, d.body.velocity.z);
-      expect(horizontal).toBeLessThanOrEqual(1.5 + 0.5 * PHYSICS.maxThrowReach * 2 + 1e-9);
+    const dirs = w.dice.map((d) => {
+      const speed = Math.hypot(d.body.velocity.x, d.body.velocity.z);
+      expect(speed).toBeGreaterThanOrEqual(PHYSICS.throwSpeedMin - 1e-9);
+      expect(speed).toBeLessThanOrEqual(PHYSICS.throwSpeedMax + 1e-9);
+      return Math.atan2(d.body.velocity.z, d.body.velocity.x);
+    });
+    // Each direction is within ±0.6 rad of a shared heading, so any two differ by ≤ 1.2 rad.
+    for (const a of dirs) {
+      for (const b of dirs) {
+        const diff = Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+        expect(diff).toBeLessThanOrEqual(1.2 + 1e-9);
+      }
     }
+  });
+
+  it('starts dice spread over the whole table, not one side', () => {
+    const w = new DiceWorld({ halfWidth: 9, halfDepth: 6 });
+    w.setDice(Array.from({ length: 20 }, () => 'd6' as const));
+    const counts = [0, 0, 0, 0];
+    for (let k = 0; k < 20; k++) {
+      w.throwDice(seededRng(k));
+      for (const d of w.dice) {
+        counts[(d.body.position.x > 0 ? 1 : 0) + (d.body.position.z > 0 ? 2 : 0)]!++;
+      }
+    }
+    for (const c of counts) expect(c).toBeGreaterThan(400 * 0.15);
+  });
+
+  it('stacks extra dice in layers when the table has too few start cells', () => {
+    const w = new DiceWorld({ halfWidth: 1, halfDepth: 1 });
+    w.setDice(['d6', 'd6', 'd6']);
+    w.throwDice(seededRng(1));
+    const heights = w.dice.map((d) => d.body.position.y).sort((a, b) => a - b);
+    expect(heights[2]! - heights[0]!).toBeGreaterThan(1);
+  });
+
+  it('shuffles indices into a permutation', () => {
+    const order = shuffled(10, seededRng(3));
+    expect([...order].sort((a, b) => a - b)).toEqual([...Array(10).keys()]);
+    expect(order).not.toEqual([...Array(10).keys()]);
+    expect(shuffled(0, seededRng(1))).toEqual([]);
+  });
+
+  it('gives the d100 a ball for die contacts and keeps its hull for the table only', () => {
+    const w = new DiceWorld(arena);
+    const [d100, d6] = w.setDice(['d100', 'd6']) as [PhysicsDie, PhysicsDie];
+    const [hull, ball] = d100.body.shapes as [CANNON.Shape, CANNON.Shape];
+    expect(ball).toBeInstanceOf(CANNON.Sphere);
+    expect(hull.collisionFilterMask).toBe(COLLISION.table);
+    expect(ball.collisionFilterMask & COLLISION.table).toBe(0);
+    const d6Hull = d6.body.shapes[0]!;
+    expect(d6Hull.collisionFilterMask & ball.collisionFilterGroup).not.toBe(0);
+    expect(d6Hull.collisionFilterMask & hull.collisionFilterGroup).toBe(0);
+    const r = (ball as CANNON.Sphere).radius;
+    expect(r).toBeGreaterThan(0.9);
+    expect(r).toBeLessThanOrEqual(1);
+    expect(ballRadius(d100.data)).toBe(r);
+  });
+
+  it('lets a d6 dropped onto a d100 bounce off instead of passing through it', () => {
+    const w = new DiceWorld(arena);
+    const [d100, d6] = w.setDice(['d100', 'd6']) as [PhysicsDie, PhysicsDie];
+    d100.body.position.set(0, 1, 0);
+    d6.body.position.set(0.2, 3.2, 0.1);
+    d6.body.velocity.set(0, -5, 0);
+    let closest = Infinity;
+    for (let i = 0; i < 240; i++) {
+      w.step(PHYSICS.timeStep);
+      closest = Math.min(closest, d6.body.position.distanceTo(d100.body.position));
+    }
+    // A d6 is 0.5 from centre to face; the ball ~0.97. They touch at ~1.47, never closer.
+    expect(closest).toBeGreaterThan(1.35);
+  });
+
+  it('finishes and freezes dice that keep jittering but never fall asleep', () => {
+    const w = new DiceWorld(arena);
+    const [die] = w.setDice(['d6']) as [PhysicsDie];
+    w.throwDice(seededRng(8));
+    die.body.position.set(0, 0.5, 0);
+    die.body.quaternion.set(0, 0, 0, 1); // flat
+    die.body.allowSleep = false; // like a die buzzing against a wall
+    let steps = 0;
+    let done = false;
+    while (!done && steps < 600) {
+      die.body.velocity.set(0.1, 0, 0);
+      done = w.advance(PHYSICS.timeStep);
+      steps++;
+    }
+    expect(done).toBe(true);
+    expect(steps * PHYSICS.timeStep).toBeLessThan(PHYSICS.settleTimeoutSeconds);
+    expect(steps * PHYSICS.timeStep).toBeGreaterThanOrEqual(PHYSICS.stillSeconds);
+    expect(die.body.velocity.length()).toBe(0);
   });
 
   it('starts mixed dice far enough apart that none overlap', () => {
