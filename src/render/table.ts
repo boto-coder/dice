@@ -193,9 +193,11 @@ export function createDiceTable(
       diceCount = dice.length;
       resize();
       const physicsDice = world.setDice(dice.map((d) => d.shape));
-      meshes = dice.map((die, i) => createDieMesh(die, physicsDice[i]!.data));
+      world.throwDice(rng); // also decides each die's label order
+      meshes = dice.map((die, i) =>
+        createDieMesh(die, physicsDice[i]!.data, physicsDice[i]!.labelOrder),
+      );
       scene.add(...meshes);
-      world.throwDice(rng);
       if (reducedMotion()) {
         const faces = settleInstantly(world);
         sync();
