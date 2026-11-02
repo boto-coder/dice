@@ -12,10 +12,12 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run typecheck && npm run lint && npm run format:check && npm run test:unit && npm run test:e2e",
-    "test:unit": "vitest run --coverage",
-    "test:watch": "vitest",
+    "test": "npm run typecheck && npm run lint && npm run format:check && npm run test:unit && npm run test:fairness && npm run test:e2e",
+    "test:unit": "vitest run --coverage --exclude 'tests/fairness/**'",
+    "test:fairness": "vitest run tests/fairness --coverage.enabled=false",
+    "test:watch": "vitest --exclude 'tests/fairness/**'",
     "test:e2e": "playwright test",
+    "fairness": "FAIRNESS_REPORT=1 vitest run tests/fairness/report.test.ts --coverage.enabled=false && prettier --write docs/fairness-report.md",
     "screenshots": "node scripts/screenshots.mjs"
   },
   "devDependencies": {
