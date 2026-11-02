@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { DieDefinition } from '../core/dice';
 import type { Crit } from '../core/results';
 import { secureRandom, type Rng } from '../core/random';
-import { DiceWorld, type Arena } from '../physics/world';
+import { DiceWorld, PHYSICS, type Arena } from '../physics/world';
 import { createDieMesh, disposeDieMesh, setGlow } from './dieMesh';
 
 /** The 3D dice table as seen by the app: throw dice, get logical face indices back. */
@@ -67,8 +67,35 @@ export function arenaForView(aspect: number, height: number, fovDeg: number = VI
   };
 }
 
+/** True when the user asked the OS/browser for less motion. */
+export function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+/**
+ * Settles a throw without animating it: the physics runs to the end at once
+ * and only the resting dice are shown. The throw is randomised exactly like
+ * an animated one, so the results are just as fair.
+ */
+export function settleInstantly(world: DiceWorld): number[] {
+  while (!world.advance(PHYSICS.timeStep));
+  return world.readResults();
+}
+
+export interface DiceTableOptions {
+  rng?: Rng;
+  /** Checked on every roll; defaults to the prefers-reduced-motion media query. */
+  reducedMotion?: () => boolean;
+}
+
 /** Creates the WebGL dice table inside `container`. Throws if WebGL is unavailable. */
-export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom): DiceTable {
+export function createDiceTable(
+  container: HTMLElement,
+  { rng = secureRandom, reducedMotion = prefersReducedMotion }: DiceTableOptions = {},
+): DiceTable {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -169,6 +196,12 @@ export function createDiceTable(container: HTMLElement, rng: Rng = secureRandom)
       meshes = dice.map((die, i) => createDieMesh(die, physicsDice[i]!.data));
       scene.add(...meshes);
       world.throwDice(rng);
+      if (reducedMotion()) {
+        const faces = settleInstantly(world);
+        sync();
+        render();
+        return Promise.resolve(faces);
+      }
       sync();
       lastTime = 0;
       return new Promise<number[]>((resolve) => {
