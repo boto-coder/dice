@@ -34,9 +34,15 @@ test('every control can be reached with Tab, in a sensible order', async ({ page
   await page.getByRole('button', { name: 'Add d4 to tray' }).focus();
   const names: string[] = [await focusedName(page)];
   for (let i = 0; i < 25; i++) {
+    const before = await page.evaluateHandle(() => document.activeElement);
     await page.keyboard.press('Tab');
-    // Past the last control, focus leaves the page (to the browser UI).
-    if (await page.evaluate(() => document.activeElement === document.body)) break;
+    // Past the last control, focus leaves the page for the browser UI: Chromium
+    // then reports <body> as focused, Firefox keeps the last control.
+    const left = await page.evaluate(
+      (prev) => document.activeElement === document.body || document.activeElement === prev,
+      before,
+    );
+    if (left) break;
     names.push(await focusedName(page));
   }
   expect(names).toEqual([
