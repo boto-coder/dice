@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import type { DieDefinition } from '../core/dice';
+import { STANDARD_DICE, type DieDefinition } from '../core/dice';
 import type { Crit } from '../core/results';
 import { secureRandom, type Rng } from '../core/random';
 import { DiceWorld, PHYSICS, type Arena } from '../physics/world';
+import { polyhedronFor } from '../physics/polyhedra';
 import { createDieMesh, disposeDieMesh, setGlow } from './dieMesh';
+import { dieAtlas } from './faceTexture';
 
 /** The 3D dice table as seen by the app: throw dice, get logical face indices back. */
 export interface DiceTable {
@@ -100,6 +102,8 @@ export function createDiceTable(
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  // Checking shader errors reads the compile log synchronously, which stalls; dev only.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV;
   renderer.domElement.className = 'table__canvas';
   container.append(renderer.domElement);
 
@@ -129,11 +133,20 @@ export function createDiceTable(
   let lastTime = 0;
   let diceCount = 0;
 
+  let canvasWidth = 0;
+  let canvasHeight = 0;
+
+  /** Fits the camera and arena to the container and the number of dice. */
   function resize(): void {
     const width = Math.max(1, container.clientWidth);
     const height = Math.max(1, container.clientHeight);
     const aspect = width / height;
-    renderer.setSize(width, height, false);
+    // Reallocating the drawing buffer is slow, so only do it when the size changed.
+    if (width !== canvasWidth || height !== canvasHeight) {
+      renderer.setSize(width, height, false);
+      canvasWidth = width;
+      canvasHeight = height;
+    }
     camera.aspect = aspect;
     const h = cameraHeightForDice(aspect, diceCount);
     camera.position.set(0, h, 0);
@@ -183,6 +196,30 @@ export function createDiceTable(
   observer.observe(container);
   resize();
 
+  // Draw and upload the standard dice's label textures while the browser is
+  // idle, one die at a time, so the first roll doesn't stall on them.
+  const idle = (fn: () => void): void => {
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(fn);
+    else setTimeout(fn, 50);
+  };
+  let disposed = false;
+  const warmUp = (index: number): void => {
+    if (disposed) return;
+    const die = STANDARD_DICE[index];
+    if (!die) {
+      // Finally compile the dice shaders once, with a temporary die in the scene.
+      const sample = createDieMesh(STANDARD_DICE[1]!, polyhedronFor('d6'));
+      scene.add(sample);
+      renderer.compile(scene, camera);
+      scene.remove(sample);
+      disposeDieMesh(sample);
+      return;
+    }
+    renderer.initTexture(dieAtlas(die, polyhedronFor(die.shape)).texture);
+    idle(() => warmUp(index + 1));
+  };
+  idle(() => warmUp(0));
+
   return {
     roll(dice) {
       if (pending) return Promise.reject(new Error('A roll is already in progress'));
@@ -216,6 +253,7 @@ export function createDiceTable(
       render();
     },
     dispose() {
+      disposed = true;
       renderer.setAnimationLoop(null);
       observer.disconnect();
       for (const m of meshes) disposeDieMesh(m);
