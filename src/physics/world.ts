@@ -22,7 +22,7 @@ export const PHYSICS = {
   gravity: -50,
   timeStep: 1 / 60,
   diceMass: 1,
-  floorFriction: 0.25,
+  floorFriction: 0.35,
   floorRestitution: 0.35,
   wallFriction: 0.05,
   wallRestitution: 0.6,
@@ -65,7 +65,21 @@ export interface PhysicsDie {
   readonly normals: readonly Vec3Tuple[];
   /** Directions that decide the result: face normals, or corner directions for a d4. */
   readonly readVectors: readonly Vec3Tuple[];
+  /**
+   * Which label each physical face shows for the current throw: face k shows
+   * label labelOrder[k]. Null means face k shows label k.
+   */
+  labelOrder: readonly number[] | null;
 }
+
+/**
+ * Shapes whose labels are shuffled onto the faces before every throw. The
+ * d100 ball cannot be built with 100 identical faces, and fairness tests
+ * showed some of its faces land measurably more often than others (as with
+ * physical ball dice). Shuffling which number sits on which face makes every
+ * number exactly equally likely, whichever faces the physics favours.
+ */
+export const SHUFFLED_LABEL_SHAPES: ReadonlySet<DieShape> = new Set<DieShape>(['d100']);
 
 /** Floor or wall plane; collides with every die hull (but not the d100's ball). */
 function tableShape(): CANNON.Plane {
@@ -160,6 +174,8 @@ export class DiceWorld {
   private elapsed = 0;
   private nudges = 0;
   private nudgeCounts: number[] = [];
+  /** Shuffle labels of SHUFFLED_LABEL_SHAPES dice on each throw (off only to measure raw face bias). */
+  shuffleLabels = true;
   /** Seconds each die has been nearly still (see isResting). */
   private stillTime: number[] = [];
   private rng: Rng = secureRandom;
@@ -251,7 +267,14 @@ export class DiceWorld {
       });
       for (const s of dieShapes(shape, data)) body.addShape(s);
       this.world.addBody(body);
-      return { shape, body, data, normals: faceNormals(data), readVectors: readVectors(data) };
+      return {
+        shape,
+        body,
+        data,
+        normals: faceNormals(data),
+        readVectors: readVectors(data),
+        labelOrder: null,
+      };
     });
     return this._dice;
   }
@@ -274,6 +297,12 @@ export class DiceWorld {
     const cellD = depth / rows;
     const cells = shuffled(cols * rows, rng);
     const heading = randomBetween(0, 2 * Math.PI, rng);
+    for (const d of this._dice) {
+      d.labelOrder =
+        this.shuffleLabels && SHUFFLED_LABEL_SHAPES.has(d.shape)
+          ? shuffled(d.readVectors.length, rng)
+          : null;
+    }
 
     this._dice.forEach((d, i) => {
       const layer = Math.floor(i / cells.length);
@@ -407,9 +436,15 @@ export class DiceWorld {
     }
   }
 
-  /** Logical result index of each die (top face, or top corner for a d4), in die order. */
+  /**
+   * Result of each die in die order: the label index on its top face (or top
+   * corner for a d4), after any label shuffle.
+   */
   readResults(): number[] {
-    return this._dice.map((d) => topFaceIndex(d.readVectors, d.body.quaternion));
+    return this._dice.map((d) => {
+      const face = topFaceIndex(d.readVectors, d.body.quaternion);
+      return d.labelOrder ? d.labelOrder[face]! : face;
+    });
   }
 
   /**
