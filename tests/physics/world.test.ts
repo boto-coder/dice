@@ -6,10 +6,12 @@ import {
   PHYSICS,
   ballRadius,
   randomQuaternion,
+  SHUFFLED_LABEL_SHAPES,
   shuffled,
   type PhysicsDie,
 } from '../../src/physics/world';
 import { seededRng } from '../../src/core/random';
+import { topFaceIndex } from '../../src/physics/faceReading';
 import { SHAPES } from '../../src/core/dice';
 import { resultCount } from '../../src/physics/polyhedra';
 
@@ -288,6 +290,24 @@ describe('DiceWorld', () => {
     expect(steps * PHYSICS.timeStep).toBeLessThan(PHYSICS.settleTimeoutSeconds);
     expect(steps * PHYSICS.timeStep).toBeGreaterThanOrEqual(PHYSICS.stillSeconds);
     expect(die.body.velocity.length()).toBe(0);
+  });
+
+  it('shuffles d100 labels on every throw and reads results through them', () => {
+    const w = new DiceWorld(arena);
+    const [d100, d6] = w.setDice(['d100', 'd6']) as [PhysicsDie, PhysicsDie];
+    expect(SHUFFLED_LABEL_SHAPES.has('d100')).toBe(true);
+    const rng = seededRng(12);
+    w.throwDice(rng);
+    const first = d100.labelOrder!;
+    expect([...first].sort((a, b) => a - b)).toEqual([...Array(100).keys()]);
+    expect(d6.labelOrder).toBeNull();
+    w.throwDice(rng);
+    expect(d100.labelOrder).not.toEqual(first);
+
+    while (!w.advance(PHYSICS.timeStep));
+    const top = topFaceIndex(d100.readVectors, d100.body.quaternion);
+    expect(w.readResults()[0]).toBe(d100.labelOrder![top]);
+    expect(w.readResults()[1]).toBe(topFaceIndex(d6.readVectors, d6.body.quaternion));
   });
 
   it('starts mixed dice far enough apart that none overlap', () => {
