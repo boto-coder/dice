@@ -3,6 +3,7 @@ import type { DieShape } from '../core/dice';
 import { randomBetween, secureRandom, type Rng } from '../core/random';
 import { rotatedY, topFaceIndex } from './faceReading';
 import {
+  faceNormal,
   faceNormals,
   polyhedronFor,
   readVectors,
@@ -42,8 +43,18 @@ export const PHYSICS = {
    */
   flatThreshold: 0.95,
   maxNudges: 3,
-  /** Throw speed grows with distance to the target, up to this distance. */
-  maxThrowReach: 8,
+  /**
+   * A die moving slower than this (units/s, rad/s) for stillSeconds counts as
+   * resting even if the engine never puts it to sleep.
+   */
+  stillSpeed: 0.3,
+  stillSpin: 0.8,
+  stillSeconds: 0.4,
+  /** Share of the table (per axis) over which dice start. */
+  throwSpread: 0.8,
+  /** Horizontal throw speed range. */
+  throwSpeedMin: 2,
+  throwSpeedMax: 6,
 } as const;
 
 export interface PhysicsDie {
@@ -56,11 +67,71 @@ export interface PhysicsDie {
   readonly readVectors: readonly Vec3Tuple[];
 }
 
+/** Floor or wall plane; collides with every die hull (but not the d100's ball). */
+function tableShape(): CANNON.Plane {
+  const plane = new CANNON.Plane();
+  plane.collisionFilterGroup = COLLISION.table;
+  plane.collisionFilterMask = COLLISION.hull | COLLISION.ballHull;
+  return plane;
+}
+
 function toConvex(data: PolyhedronData): CANNON.ConvexPolyhedron {
   return new CANNON.ConvexPolyhedron({
     vertices: data.vertices.map(([x, y, z]) => new CANNON.Vec3(x, y, z)),
     faces: data.faces.map((f) => [...f]),
   });
+}
+
+/**
+ * Collision groups (bit flags). The d100's 100-face hull is very expensive to
+ * collide with another hull, so it touches only the table; a ball shape
+ * stands in for it against other dice. Its resting face is still decided by
+ * the real hull on the floor, so the result stays fair.
+ */
+export const COLLISION = {
+  table: 1,
+  hull: 2,
+  ballHull: 4,
+  ball: 8,
+} as const;
+
+/** Radius of the ball standing in for a ball-style die: midway between in- and circumradius. */
+export function ballRadius(data: PolyhedronData): number {
+  const inradius = Math.min(
+    ...data.faces.map((_, i) => {
+      const n = faceNormal(data, i);
+      const v = data.vertices[data.faces[i]![0]!]!;
+      return n[0] * v[0] + n[1] * v[1] + n[2] * v[2];
+    }),
+  );
+  const circumradius = Math.max(...data.vertices.map((v) => Math.hypot(...v)));
+  return (inradius + circumradius) / 2;
+}
+
+/** Collision shapes of a die body, with their collision groups set. */
+export function dieShapes(shape: DieShape, data: PolyhedronData): CANNON.Shape[] {
+  const hull = toConvex(data);
+  if (shape !== 'd100') {
+    hull.collisionFilterGroup = COLLISION.hull;
+    hull.collisionFilterMask = COLLISION.table | COLLISION.hull | COLLISION.ball;
+    return [hull];
+  }
+  hull.collisionFilterGroup = COLLISION.ballHull;
+  hull.collisionFilterMask = COLLISION.table;
+  const ball = new CANNON.Sphere(ballRadius(data));
+  ball.collisionFilterGroup = COLLISION.ball;
+  ball.collisionFilterMask = COLLISION.hull | COLLISION.ball;
+  return [hull, ball];
+}
+
+/** The numbers 0..n-1 in random order (Fisher–Yates). */
+export function shuffled(n: number, rng: Rng): number[] {
+  const out = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
 }
 
 /** Uniformly random rotation (Shoemake's method). */
@@ -89,6 +160,8 @@ export class DiceWorld {
   private elapsed = 0;
   private nudges = 0;
   private nudgeCounts: number[] = [];
+  /** Seconds each die has been nearly still (see isResting). */
+  private stillTime: number[] = [];
   private rng: Rng = secureRandom;
 
   constructor(arena: Arena) {
@@ -117,7 +190,7 @@ export class DiceWorld {
 
     const floor = new CANNON.Body({
       type: CANNON.Body.STATIC,
-      shape: new CANNON.Plane(),
+      shape: tableShape(),
       material: this.floorMaterial,
     });
     floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0); // plane normal +z -> +y
@@ -152,7 +225,7 @@ export class DiceWorld {
     this.walls = specs.map(([pos, [x, y, z]]) => {
       const body = new CANNON.Body({
         type: CANNON.Body.STATIC,
-        shape: new CANNON.Plane(),
+        shape: tableShape(),
         material: this.wallMaterial,
         position: pos,
       });
@@ -169,7 +242,6 @@ export class DiceWorld {
       const data = polyhedronFor(shape);
       const body = new CANNON.Body({
         mass: PHYSICS.diceMass,
-        shape: toConvex(data),
         material: this.diceMaterial,
         allowSleep: true,
         sleepSpeedLimit: PHYSICS.sleepSpeedLimit,
@@ -177,6 +249,7 @@ export class DiceWorld {
         angularDamping: PHYSICS.angularDamping,
         linearDamping: PHYSICS.linearDamping,
       });
+      for (const s of dieShapes(shape, data)) body.addShape(s);
       this.world.addBody(body);
       return { shape, body, data, normals: faceNormals(data), readVectors: readVectors(data) };
     });
@@ -184,38 +257,41 @@ export class DiceWorld {
   }
 
   /**
-   * Throws all dice from the left side toward random points on the table,
-   * with random orientation, speed and spin. Dice start in a spaced 3D grid
-   * so they never overlap, and each aims at its own target so they spread out.
+   * Throws all dice: they start spread over the whole table (a shuffled grid
+   * of cells at least one die apart, so none overlap), with random
+   * orientation and spin, and fly off in a shared random direction with some
+   * variation per die, like a handful of dice thrown together.
    */
   throwDice(rng: Rng = secureRandom): void {
     this.rng = rng;
     const { halfWidth: hw, halfDepth: hd } = this._arena;
-    // Spread starting positions by the largest die so none overlap.
     const spacing = 2 * Math.max(0.5, ...this._dice.map((d) => d.data.radius)) + 0.15;
-    const perColumn = Math.max(1, Math.floor((hd * 1.6) / spacing) + 1);
-    const perLayer = perColumn * 2;
+    const width = Math.max(spacing, 2 * hw * PHYSICS.throwSpread);
+    const depth = Math.max(spacing, 2 * hd * PHYSICS.throwSpread);
+    const cols = Math.max(1, Math.floor(width / spacing));
+    const rows = Math.max(1, Math.floor(depth / spacing));
+    const cellW = width / cols;
+    const cellD = depth / rows;
+    const cells = shuffled(cols * rows, rng);
+    const heading = randomBetween(0, 2 * Math.PI, rng);
+
     this._dice.forEach((d, i) => {
-      const layer = Math.floor(i / perLayer);
-      const col = Math.floor((i % perLayer) / perColumn);
-      const row = i % perColumn;
-      const usedRows = Math.min(perColumn, this._dice.length);
+      const layer = Math.floor(i / cells.length);
+      const cell = cells[i % cells.length]!;
       const b = d.body;
       b.position.set(
-        -hw * 0.75 + col * spacing + randomBetween(-0.1, 0.1, rng),
+        -width / 2 +
+          ((cell % cols) + 0.5) * cellW +
+          randomBetween(-1, 1, rng) * ((cellW - spacing) / 2),
         PHYSICS.dropHeight + layer * spacing + randomBetween(0, 0.5, rng),
-        (row - (usedRows - 1) / 2) * spacing + randomBetween(-0.1, 0.1, rng),
+        -depth / 2 +
+          (Math.floor(cell / cols) + 0.5) * cellD +
+          randomBetween(-1, 1, rng) * ((cellD - spacing) / 2),
       );
       b.quaternion.copy(randomQuaternion(rng));
-      const tx = randomBetween(-hw * 0.2, hw * 0.7, rng);
-      const tz = randomBetween(-hd * 0.7, hd * 0.7, rng);
-      const dx = tx - b.position.x;
-      const dz = tz - b.position.z;
-      // Capped so a big (zoomed-out) table doesn't mean wilder throws.
-      const reach = Math.min(Math.hypot(dx, dz), PHYSICS.maxThrowReach);
-      const speed = 1.5 + randomBetween(0.2, 0.5, rng) * reach * 2;
-      const len = Math.hypot(dx, dz) || 1;
-      b.velocity.set((dx / len) * speed, randomBetween(-2, 1, rng), (dz / len) * speed);
+      const angle = heading + randomBetween(-0.6, 0.6, rng);
+      const speed = randomBetween(PHYSICS.throwSpeedMin, PHYSICS.throwSpeedMax, rng);
+      b.velocity.set(Math.cos(angle) * speed, randomBetween(-2, 1, rng), Math.sin(angle) * speed);
       b.angularVelocity.set(
         randomBetween(-25, 25, rng),
         randomBetween(-25, 25, rng),
@@ -226,6 +302,7 @@ export class DiceWorld {
     this.elapsed = 0;
     this.nudges = 0;
     this.nudgeCounts = [];
+    this.stillTime = [];
   }
 
   /** Advances the simulation by `dt` seconds of real time. */
@@ -263,12 +340,17 @@ export class DiceWorld {
     this._dice.forEach((d, i) => {
       const count = this.nudgeCounts[i] ?? 0;
       if (count >= PHYSICS.maxNudges) return;
-      if (d.body.sleepState !== CANNON.Body.SLEEPING || !this.isCocked(d)) return;
+      if (!this.isResting(i) || !this.isCocked(d)) return;
       this.nudgeCounts[i] = count + 1;
       this.nudges++;
       nudged = true;
       const b = d.body;
-      b.velocity.set(randomBetween(-2, 2, this.rng), 6, randomBetween(-2, 2, this.rng));
+      // Hop toward the middle of the table, so a die leaning on a wall gets away from it.
+      const toCentre =
+        Math.atan2(-b.position.z, -b.position.x) + randomBetween(-0.8, 0.8, this.rng);
+      const speed = randomBetween(0.5, 2.5, this.rng);
+      b.velocity.set(Math.cos(toCentre) * speed, 6, Math.sin(toCentre) * speed);
+      this.stillTime[i] = 0;
       b.angularVelocity.set(
         randomBetween(-10, 10, this.rng),
         randomBetween(-10, 10, this.rng),
@@ -286,12 +368,34 @@ export class DiceWorld {
    */
   advance(dt: number): boolean {
     this.step(dt);
+    this._dice.forEach((d, i) => {
+      const b = d.body;
+      const still =
+        b.velocity.lengthSquared() < PHYSICS.stillSpeed ** 2 &&
+        b.angularVelocity.lengthSquared() < PHYSICS.stillSpin ** 2;
+      this.stillTime[i] = still ? (this.stillTime[i] ?? 0) + dt : 0;
+    });
     if (this.elapsed >= PHYSICS.settleTimeoutSeconds) {
       this.freeze();
       return true;
     }
     if (this.nudgeCocked()) return false;
-    return this.isSettled();
+    if (this.isSettled()) return true;
+    if (this._dice.every((_, i) => this.isResting(i))) {
+      // Some dice jitter (e.g. leaning on a wall) and never fall asleep; stop them.
+      this.freeze();
+      return true;
+    }
+    return false;
+  }
+
+  /** Asleep, or barely moving for PHYSICS.stillSeconds (a jittering die may never sleep). */
+  private isResting(index: number): boolean {
+    const d = this._dice[index]!;
+    return (
+      d.body.sleepState === CANNON.Body.SLEEPING ||
+      (this.stillTime[index] ?? 0) >= PHYSICS.stillSeconds
+    );
   }
 
   /** Stops all dice where they are, so what is shown matches what is read. */
