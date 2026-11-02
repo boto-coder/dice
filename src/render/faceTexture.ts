@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { DieDefinition } from '../core/dice';
 import { faceNormal, type PolyhedronData } from '../physics/polyhedra';
+import { SHUFFLED_LABEL_SHAPES } from '../physics/world';
 import { atlasLayout, atlasPixel, faceUVs, inradius, type AtlasLayout, type UV } from './faceUV';
 
 export const FACE_STYLE = {
@@ -97,10 +98,14 @@ export function dieAtlas(die: DieDefinition, data: PolyhedronData): DieAtlas {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const span = layout.cell * (1 - 2 * layout.pad);
+  // Shuffled dice may show any label on any face, so every label must fit the smallest face.
+  const uniformR = SHUFFLED_LABEL_SHAPES.has(die.shape)
+    ? Math.min(...uvs.map((faceUv) => inradius(faceUv))) * span
+    : null;
   data.faces.forEach((face, fi) => {
     const faceUv = uvs[fi]!;
     const [cx, cy] = atlasPixel(layout, fi, [0.5, 0.5]);
-    const r = inradius(faceUv) * span;
+    const r = uniformR ?? inradius(faceUv) * span;
     if (data.readBy === 'vertex') {
       // d4 style: each corner of the face shows that corner's number, pointing at it.
       face.forEach((vi, k) => {
