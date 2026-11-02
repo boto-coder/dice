@@ -7,9 +7,14 @@ import { atlasUV } from './faceUV';
 
 /**
  * Builds a die mesh whose face i matches face i of the physics body, textured
- * from one atlas holding all of the die's labels.
+ * from one atlas holding all of the die's labels. With a `labelOrder`, face k
+ * shows label labelOrder[k] (see SHUFFLED_LABEL_SHAPES).
  */
-export function createDieMesh(die: DieDefinition, data: PolyhedronData): THREE.Group {
+export function createDieMesh(
+  die: DieDefinition,
+  data: PolyhedronData,
+  labelOrder: readonly number[] | null = null,
+): THREE.Group {
   const atlas = dieAtlas(die, data);
   const positions: number[] = [];
   const normals: number[] = [];
@@ -19,12 +24,13 @@ export function createDieMesh(die: DieDefinition, data: PolyhedronData): THREE.G
     const points = face.map((vi) => data.vertices[vi]!);
     const n = faceNormal(data, fi);
     const faceUv = atlas.faceUVs[fi]!;
+    const cell = labelOrder ? labelOrder[fi]! : fi;
     // Fan-triangulate the convex polygon.
     for (let k = 1; k < points.length - 1; k++) {
       for (const idx of [0, k, k + 1]) {
         positions.push(...points[idx]!);
         normals.push(...n);
-        uvs.push(...atlasUV(atlas.layout, fi, faceUv[idx]!));
+        uvs.push(...atlasUV(atlas.layout, cell, faceUv[idx]!));
       }
     }
   });
