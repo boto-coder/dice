@@ -16,3 +16,12 @@ function browserStorage(): Storage | null {
 }
 
 mountApp(root, { createTable: (el) => createDiceTable(el), storage: browserStorage() });
+
+// Offline support: the service worker only exists in production builds.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // Not fatal: the app still works online.
+    });
+  });
+}
