@@ -13,7 +13,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["src", "tests", "e2e", "*.config.ts"]
+  "include": ["src", "tests", "e2e", "pwa", "*.config.ts"]
 }
