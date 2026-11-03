@@ -6,6 +6,7 @@ import { DiceWorld, PHYSICS, type Arena } from '../physics/world';
 import { polyhedronFor } from '../physics/polyhedra';
 import { createDieMesh, disposeDieMesh, setGlow } from './dieMesh';
 import { dieAtlas } from './faceTexture';
+import type { Theme } from '../core/settings';
 
 /** The 3D dice table as seen by the app: throw dice, get logical face indices back. */
 export interface DiceTable {
@@ -13,6 +14,8 @@ export interface DiceTable {
   roll(dice: readonly DieDefinition[]): Promise<number[]>;
   /** Highlights settled dice (e.g. a natural 20 or 1), in the same order as the last roll. */
   highlight(marks: readonly Crit[]): void;
+  /** Adapts lighting and shadows to the page theme (the table colour itself is CSS). */
+  setTheme(theme: Theme): void;
   dispose(): void;
 }
 
@@ -87,6 +90,17 @@ export function settleInstantly(world: DiceWorld): number[] {
   return world.readResults();
 }
 
+/**
+ * Per theme: shadows must be darker to show on dark felt, and the light
+ * bounced up from the table takes on its colour.
+ */
+export const TABLE_THEMES: Readonly<
+  Record<Theme, { readonly shadowOpacity: number; readonly groundColor: number }>
+> = {
+  dark: { shadowOpacity: 0.45, groundColor: 0x9fb5aa },
+  light: { shadowOpacity: 0.18, groundColor: 0xd8dce2 },
+};
+
 export interface DiceTableOptions {
   rng?: Rng;
   /** Checked on every roll; defaults to the prefers-reduced-motion media query. */
@@ -111,7 +125,8 @@ export function createDiceTable(
   const camera = new THREE.PerspectiveCamera(VIEW.fov, 1, 0.1, 100);
   camera.up.set(0, 0, -1); // screen-up is the back of the table
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8dce2, 2.2));
+  const ambient = new THREE.HemisphereLight(0xffffff, 0xd8dce2, 2.2);
+  scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
   sun.position.set(-4, 15, 6);
   sun.castShadow = true;
@@ -119,10 +134,8 @@ export function createDiceTable(
   sun.shadow.radius = 4;
   scene.add(sun);
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200),
-    new THREE.ShadowMaterial({ opacity: 0.18 }),
-  );
+  const shadowMaterial = new THREE.ShadowMaterial({ opacity: TABLE_THEMES.dark.shadowOpacity });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), shadowMaterial);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
@@ -247,6 +260,12 @@ export function createDiceTable(
         pending = resolve;
         renderer.setAnimationLoop(frame);
       });
+    },
+    setTheme(theme) {
+      const look = TABLE_THEMES[theme];
+      shadowMaterial.opacity = look.shadowOpacity;
+      ambient.groundColor.setHex(look.groundColor);
+      render();
     },
     highlight(marks) {
       meshes.forEach((m, i) => setGlow(m, marks[i] ?? null));
