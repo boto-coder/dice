@@ -28,6 +28,24 @@ Physics for 20 mixed dice costs about 0.2 ms per step in Node (one step per fram
 | Every roll reallocated the WebGL drawing buffer to update the zoom                     | part of the stall above                                          | Only resize the canvas when its size really changes                             | —               |
 | Shader error checks read compile logs synchronously                                    | part of the stall above                                          | Disabled in production builds (as three.js recommends)                          | —               |
 
+## Dice looks (milestone 11)
+
+Measured with `node scripts/perf.mjs --styled` (every die type a different look: solid,
+marble, speckled, gradient, swirl and stripes, in matte, glossy and metallic), production build,
+headless Chromium with software WebGL.
+
+| Run                    | Mean frame       | Median  | Worst frame, first roll (before → after) |
+| ---------------------- | ---------------- | ------- | ---------------------------------------- |
+| Desktop 1280×860       | 16.7 ms (60 fps) | 16.7 ms | 733 ms → 33 ms                           |
+| Pixel 7 emulation      | 17.6 ms (57 fps) | 16.7 ms | 650 ms → 33 ms                           |
+| Pixel 7, 4× slower CPU | 22.0 ms (45 fps) | 16.7 ms | 733 ms → 67 ms                           |
+
+Patterns are drawn once per look into the label texture, so they cost nothing per frame.
+The first-roll stall came from shaders the warm-up did not build: the reflective
+(glossy/metallic) shader with its reflection map, and the shadow-map shader (also missing for
+plain dice, the 117–150 ms above). The warm-up now draws one hidden frame with one sample die per
+finish in use, which builds all of them; the default look's first roll is now 33–100 ms too.
+
 ## Settling
 
 See [fairness-report.md](fairness-report.md): single dice settle in 1.0–1.8 s on average and a
