@@ -26,7 +26,6 @@ npx playwright install chromium   # first time only, for e2e tests
 | `npm run test:watch`    | Vitest in watch mode                                                              |
 | `npm run test:e2e`      | Playwright end-to-end tests (desktop + mobile viewports)                          |
 | `npm run test:firefox`  | The e2e tests in Firefox                                                          |
-| `npm run test:webkit`   | The e2e tests in WebKit (Safari's engine; needs Ubuntu/macOS system libraries)    |
 | `npm run lint`          | ESLint                                                                            |
 | `npm run format`        | Format all files with Prettier                                                    |
 
@@ -52,10 +51,11 @@ against `npm run preview` (results in `docs/performance.md`).
 
 ## Deployment
 
-Every push to `master` on GitHub runs [the workflow](.github/workflows/deploy.yml): the full
-test suite, the e2e tests again under `/dice/` and in Firefox and WebKit, and then, only if
-everything passed, a build with `BASE_PATH=/dice/` that is published to GitHub Pages. Only
-`dist/` is published, not the rest of the repository.
+Every push to `master` on GitHub runs [the workflow](.github/workflows/deploy.yml): type check,
+lint, format check, unit and fairness tests, then a build with `BASE_PATH=/dice/` that is
+published to GitHub Pages (only `dist/`, not the rest of the repository). The browser (e2e) tests
+don't run there, to keep deploys quick, so run `npm test` and `npm run test:firefox` locally
+before pushing.
 
 To try the Pages build locally: `BASE_PATH=/dice/ npm run build && BASE_PATH=/dice/ npm run preview`,
 then open http://localhost:4173/dice/. `node scripts/livecheck.mjs` checks the live site (it
