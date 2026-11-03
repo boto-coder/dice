@@ -177,4 +177,5 @@ _Status: v1 · Last updated: 2026-11-03_
 9. **Review:** Full test pass and a walkthrough with you, then revisit visual style and the open questions.
    - Done: see [docs/walkthrough.md](docs/walkthrough.md). Hosting decided (GitHub Pages), theme decided (dark by default with a switch), dice styles planned.
 10. **Dark theme:** Dark / Light / System switch (dark by default), themed colours for the whole UI and the table, saved choice applied before first paint, contrast checks in both themes.
+    - Done: a green-felt dark table and dark UI, the switch in the header (one radio group), System follows the device live, and a unit test checks 4.5:1 contrast for every text colour pair in both themes.
 11. **Dice appearance:** Styles per standard die type and per custom die (colour, label colour, pattern, finish), presets, Appearance dialog with a 3D preview, persistence, performance check.
