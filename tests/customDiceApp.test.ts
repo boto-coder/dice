@@ -26,6 +26,7 @@ const table = {
   roll: vi.fn<DiceTable['roll']>(() => new Promise((res) => (resolveRoll = res))),
   highlight: vi.fn(),
   setTheme: vi.fn(),
+  prepare: vi.fn(),
   dispose: vi.fn(),
 } satisfies DiceTable;
 
@@ -296,5 +297,66 @@ describe('storage problems', () => {
     await createDie(user, 'Coin', ['H', 'T', 'H', 'T']);
     expect(button('Add Coin to tray')).toBeInTheDocument();
     expect(root.querySelector('.manager__notice')).toHaveAttribute('hidden');
+  });
+});
+
+describe('custom die look', () => {
+  const look = () => within(getByRole(dialog(), 'group', { name: 'Look' }));
+
+  it('saves a chosen look with the die and rolls it in that look', async () => {
+    const { user, storage } = mount();
+    await user.click(button('Manage'));
+    await user.click(button('New custom die', dialog()));
+    const d = within(dialog());
+    await user.type(d.getByLabelText('Name'), 'Coin');
+    await user.selectOptions(d.getByLabelText('Number of faces'), '4');
+    for (const [i, face] of ['H', 'T', 'H', 'T'].entries()) {
+      await user.type(d.getByLabelText(`Face ${i + 1}`), face);
+    }
+    await user.click(look().getByRole('button', { name: 'Gold' }));
+    await user.click(button('Save', dialog()));
+
+    const saved = JSON.parse(storage.data.get(STORAGE_KEY)!);
+    expect(saved.version).toBe(2);
+    expect(saved.dice[0].style).toMatchObject({ body: '#d4a73a', finish: 'metallic' });
+
+    await user.click(button('Close', dialog()));
+    await user.click(button('Add Coin to tray'));
+    await user.click(button('Roll'));
+    expect(table.roll.mock.calls[0]![0][0]!.style).toMatchObject({ body: '#d4a73a' });
+    await finish([2]);
+  });
+
+  it('does not store the default look', async () => {
+    const { user, storage } = mount();
+    await createDie(user, 'Coin', ['H', 'T', 'H', 'T']);
+    const saved = JSON.parse(storage.data.get(STORAGE_KEY)!);
+    expect(saved.dice[0]).not.toHaveProperty('style');
+  });
+
+  it('shows the saved look when editing', async () => {
+    const styled = {
+      version: 2,
+      dice: [
+        {
+          ...COMBAT.dice[0],
+          style: {
+            body: '#0b4f6c',
+            accent: '#8fdcf5',
+            label: 'auto',
+            pattern: 'speckled',
+            finish: 'matte',
+          },
+        },
+      ],
+    };
+    const { user } = mount(memoryStorage({ [STORAGE_KEY]: JSON.stringify(styled) }));
+    await user.click(button('Manage'));
+    await user.click(button('Edit Combat', dialog()));
+    expect(look().getByRole('button', { name: 'Ocean speckle' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(look().getByLabelText('Pattern')).toHaveValue('speckled');
   });
 });
