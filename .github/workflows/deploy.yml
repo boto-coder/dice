@@ -1,5 +1,7 @@
-# Tests every push to master and, if everything passes, publishes the built app
+# Checks every push to master and, if the checks pass, publishes the built app
 # (only dist/) to GitHub Pages at https://boto-coder.github.io/dice/.
+# Browser (e2e) tests are not run here, to keep deploys quick: run them locally
+# with `npm test` (Chromium) and `npm run test:firefox`.
 name: Test and deploy
 
 on:
@@ -17,9 +19,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -27,28 +29,22 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Install browsers (with the system libraries WebKit needs)
-        run: npx playwright install --with-deps chromium firefox webkit
-      - name: Full suite (types, lint, format, unit, fairness, e2e in Chromium)
-        run: npm test
-      - name: e2e under /dice/, as served on GitHub Pages
-        run: npm run test:e2e
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:unit
+      - run: npm run test:fairness
+      - name: Build for /dice/
+        run: npm run build
         env:
           BASE_PATH: /dice/
-      - name: e2e in Firefox
-        run: npm run test:firefox
-      - name: e2e in WebKit (Safari's engine)
-        run: npm run test:webkit
-      - uses: actions/upload-artifact@v4
-        if: failure()
+      - uses: actions/upload-pages-artifact@v4
         with:
-          name: test-results
-          path: test-results/
-          retention-days: 7
+          path: dist
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -58,19 +54,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: Build for /dice/
-        run: npm run build
-        env:
-          BASE_PATH: /dice/
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
