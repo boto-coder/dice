@@ -65,9 +65,18 @@ test('every control can be reached with Tab, in a sensible order', async ({ page
 
 test('shows a visible focus ring on keyboard focus', async ({ page }) => {
   await page.goto('./');
+  // The first stop is the theme switch: its radio is invisible, so the ring is on its label.
   await page.keyboard.press('Tab');
-  const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
-  expect(outline).toBe('solid');
+  const ring = () =>
+    page.evaluate(() => {
+      const focused = document.activeElement!;
+      return getComputedStyle(focused.closest('label') ?? focused).outlineStyle;
+    });
+  expect(await ring()).toBe('solid');
+  // And on an ordinary button.
+  await page.getByRole('button', { name: 'Add d4 to tray' }).focus();
+  await page.keyboard.press('Tab');
+  expect(await ring()).toBe('solid');
 });
 
 test('the custom dice dialog works from the keyboard and traps focus', async ({ page }) => {
