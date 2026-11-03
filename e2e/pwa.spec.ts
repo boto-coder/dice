@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('has an installable web manifest with icons', async ({ page, request }) => {
-  await page.goto('/');
+  await page.goto('./');
   const href = await page.locator('link[rel="manifest"]').getAttribute('href');
   const manifest = await (await request.get(href!)).json();
   expect(manifest).toMatchObject({ name: 'Dice Roller', display: 'standalone', start_url: './' });
@@ -15,7 +15,7 @@ test('has an installable web manifest with icons', async ({ page, request }) => 
 });
 
 test('works offline after the first visit', async ({ page, context }) => {
-  await page.goto('/');
+  await page.goto('./');
   // Wait until the service worker has installed (precached the app) and controls the page.
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
