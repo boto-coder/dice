@@ -21,6 +21,7 @@ function fakeTable() {
     ),
     highlight: vi.fn(),
     setTheme: vi.fn(),
+    prepare: vi.fn<DiceTable['prepare']>(),
     dispose: vi.fn(),
   } satisfies DiceTable;
   return {
@@ -394,5 +395,96 @@ describe('theme switch', () => {
     });
     await userEvent.setup().click(radio('Light'));
     expect(document.documentElement.dataset.theme).toBe('light');
+  });
+});
+
+describe('dice appearance', () => {
+  class MemoryStorage {
+    data = new Map<string, string>();
+    getItem(key: string): string | null {
+      return this.data.get(key) ?? null;
+    }
+    setItem(key: string, value: string): void {
+      this.data.set(key, value);
+    }
+  }
+  const appearance = () => getByRole(root, 'dialog', { name: 'Dice appearance' });
+  const savedDice = (storage: MemoryStorage) =>
+    (JSON.parse(storage.getItem('dice-roller:settings')!) as { dice: Record<string, unknown> })
+      .dice;
+  const GOLD = {
+    body: '#d4a73a',
+    accent: '#fff0b3',
+    label: 'auto',
+    pattern: 'gradient',
+    finish: 'metallic',
+  };
+
+  function mountWith(storage = new MemoryStorage()) {
+    const fake = fakeTable();
+    mountApp(root, { createTable: () => fake.table, storage });
+    return { ...fake, storage, user: userEvent.setup() };
+  }
+
+  it('prepares every die in its look when the app starts', () => {
+    const { table } = mountWith();
+    expect(table.prepare).toHaveBeenCalledOnce();
+    const dice = table.prepare.mock.calls[0]![0];
+    expect(dice.map((d) => d.id)).toEqual(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']);
+    expect(dice.every((d) => d.style?.body === '#fbfbf8')).toBe(true);
+  });
+
+  it('gives a die a new look, saves it and rolls it in that look', async () => {
+    const { table, storage, user, finish } = mountWith();
+    await user.click(button('Appearance'));
+    await user.click(within(appearance()).getByRole('button', { name: 'Gold' }));
+    expect(savedDice(storage)).toEqual({ d20: GOLD });
+    expect(table.prepare).toHaveBeenCalledTimes(2);
+    await user.click(within(appearance()).getByRole('button', { name: 'Done' }));
+    expect(button('Appearance')).toHaveFocus();
+
+    await user.click(button('Add d20 to tray'));
+    await user.click(button('Add d6 to tray'));
+    await user.click(button('Roll'));
+    const [rolled] = table.roll.mock.calls[0]!;
+    expect(rolled.map((d) => [d.id, d.style?.body])).toEqual([
+      ['d20', GOLD.body],
+      ['d6', '#fbfbf8'],
+    ]);
+    await finish([7, 3]);
+  });
+
+  it('restores saved looks', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      'dice-roller:settings',
+      JSON.stringify({ version: 1, theme: 'dark', dice: { d8: GOLD } }),
+    );
+    const { table } = mountWith(storage);
+    const d8 = table.prepare.mock.calls[0]![0].find((d) => d.id === 'd8');
+    expect(d8?.style).toEqual(GOLD);
+  });
+
+  it('applies one look to all standard dice, and resets one', async () => {
+    const { storage, user } = mountWith();
+    await user.click(button('Appearance'));
+    const d = within(appearance());
+    await user.click(d.getByRole('button', { name: 'Gold' }));
+    await user.click(d.getByRole('button', { name: 'Use this look for all standard dice' }));
+    expect(Object.keys(savedDice(storage))).toEqual([
+      'd4',
+      'd6',
+      'd8',
+      'd10',
+      'd12',
+      'd20',
+      'd100',
+    ]);
+    await user.selectOptions(d.getByLabelText('Die'), 'd6');
+    expect(d.getByRole('button', { name: 'Gold' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(d.getByRole('button', { name: 'Reset to Ivory' }));
+    // The default look is not stored.
+    expect(savedDice(storage)).not.toHaveProperty('d6');
+    expect(savedDice(storage)).toHaveProperty('d4');
   });
 });
