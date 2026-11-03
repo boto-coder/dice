@@ -2,6 +2,9 @@
 
 A 3D physics dice roller for tabletop RPGs and board games. See [REQUIREMENTS.md](REQUIREMENTS.md).
 
+**Use it:** https://boto-coder.github.io/dice/ (works offline after the first visit, and can be
+added to a phone's home screen).
+
 ## Setup
 
 ```sh
@@ -16,12 +19,14 @@ npx playwright install chromium   # first time only, for e2e tests
 | `npm run dev`           | Start the dev server at http://localhost:5173                                     |
 | `npm run build`         | Type-check and build to `dist/`                                                   |
 | `npm run preview`       | Serve the production build at http://localhost:4173                               |
-| `npm test`              | Full suite: typecheck, lint, format check, unit + e2e tests                       |
+| `npm test`              | Full suite: typecheck, lint, format check, unit, fairness and e2e tests           |
 | `npm run test:unit`     | Vitest unit/DOM tests with coverage                                               |
 | `npm run test:fairness` | Seeded physics fairness tests (chi-square per die, ~40 s)                         |
 | `npm run fairness`      | Long fairness run with real randomness; writes `docs/fairness-report.md` (~4 min) |
 | `npm run test:watch`    | Vitest in watch mode                                                              |
 | `npm run test:e2e`      | Playwright end-to-end tests (desktop + mobile viewports)                          |
+| `npm run test:firefox`  | The e2e tests in Firefox                                                          |
+| `npm run test:webkit`   | The e2e tests in WebKit (Safari's engine; needs Ubuntu/macOS system libraries)    |
 | `npm run lint`          | ESLint                                                                            |
 | `npm run format`        | Format all files with Prettier                                                    |
 
@@ -44,3 +49,14 @@ usage notes at the top of the script).
 
 Frame rates while rolling 20 dice are measured with `node scripts/perf.mjs`
 against `npm run preview` (results in `docs/performance.md`).
+
+## Deployment
+
+Every push to `master` on GitHub runs [the workflow](.github/workflows/deploy.yml): the full
+test suite, the e2e tests again under `/dice/` and in Firefox and WebKit, and then, only if
+everything passed, a build with `BASE_PATH=/dice/` that is published to GitHub Pages. Only
+`dist/` is published, not the rest of the repository.
+
+To try the Pages build locally: `BASE_PATH=/dice/ npm run build && BASE_PATH=/dice/ npm run preview`,
+then open http://localhost:4173/dice/. `node scripts/livecheck.mjs` checks the live site (it
+loads, rolls, works offline, and has a valid manifest) and takes screenshots of it.
