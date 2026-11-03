@@ -117,7 +117,7 @@ _Status: v1 · Last updated: 2026-11-03_
 - **Architecture:** Keep pure logic (dice definitions, face reading, tray, results, history, storage) separate from rendering. That way the logic and physics can be tested in Node without a browser.
 - **Persistence:** `localStorage` for custom dice only, stored as versioned JSON.
 - **Backend:** None.
-- **Hosting:** GitHub Pages at https://boto-coder.github.io/dice/ (decided in milestone 9). A GitHub Actions workflow runs the full test suite on every push to `master` and publishes only the built app if it passes. Source: public GitHub repo `boto-coder/dice`; Entire session checkpoints are kept in a separate private Entire repo and never pushed to GitHub.
+- **Hosting:** GitHub Pages at https://boto-coder.github.io/dice/ (decided in milestone 9). A GitHub Actions workflow runs the type check, lint, unit and fairness tests on every push to `master` and publishes only the built app if they pass (e2e tests run locally, to keep deploys quick). Source: public GitHub repo `boto-coder/dice`; Entire session checkpoints are kept in a separate private Entire repo and never pushed to GitHub.
 
 ### 6.1 Testing (full suite)
 
