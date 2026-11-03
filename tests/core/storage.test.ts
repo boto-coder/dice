@@ -7,6 +7,7 @@ import {
 } from '../../src/core/storage';
 import { createCustomDie } from '../../src/core/customDice';
 import { findDie } from '../../src/core/dice';
+import { PRESETS } from '../../src/core/diceStyle';
 
 /** Minimal in-memory Storage stand-in. */
 class MemoryStorage {
@@ -58,7 +59,7 @@ describe('saveCustomDice / loadCustomDice', () => {
     const s = new MemoryStorage();
     saveCustomDice(s, [combat]);
     expect(JSON.parse(s.getItem(STORAGE_KEY)!)).toEqual({
-      version: 1,
+      version: 2,
       dice: [{ id: 'custom-a', name: 'Combat die', faces: ['⚔️', '⚔️', '🛡️', '🛡️', '💀', ''] }],
     });
   });
@@ -151,5 +152,42 @@ describe('loadCustomDice', () => {
 describe('saveCustomDice', () => {
   it('returns false when storage throws (e.g. quota exceeded)', () => {
     expect(saveCustomDice(throwing, [combat])).toBe(false);
+  });
+});
+
+describe('custom dice styles', () => {
+  const ruby = PRESETS.find((p) => p.id === 'ruby')!.style;
+  const styled = createCustomDie(
+    { name: 'Red', faces: ['1', '2', '3', '4'], style: ruby },
+    { id: 'custom-r' },
+  );
+
+  it('saves and loads a die with its style', () => {
+    const s = new MemoryStorage();
+    saveCustomDice(s, [styled, combat]);
+    const saved = JSON.parse(s.getItem(STORAGE_KEY)!);
+    expect(saved.version).toBe(STORAGE_VERSION);
+    expect(saved.dice[0].style).toEqual(ruby);
+    expect(saved.dice[1]).not.toHaveProperty('style');
+    expect(loadCustomDice(s)).toEqual({ dice: [styled, combat], warnings: [] });
+  });
+
+  it('still loads version 1 data (no styles)', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      dice: [{ id: 'custom-a', name: 'Combat die', faces: ['⚔️', '⚔️', '🛡️', '🛡️', '💀', ''] }],
+    });
+    expect(loadCustomDice(withRaw(raw))).toEqual({ dice: [combat], warnings: [] });
+  });
+
+  it('keeps a die whose style is invalid, with the default look and a warning', () => {
+    const raw = JSON.stringify({
+      version: 2,
+      dice: [{ id: 'custom-r', name: 'Red', faces: ['1', '2', '3', '4'], style: { body: 'red' } }],
+    });
+    const { dice, warnings } = loadCustomDice(withRaw(raw));
+    expect(dice).toHaveLength(1);
+    expect(dice[0]).not.toHaveProperty('style');
+    expect(warnings).toEqual(['The look of saved die "Red" was invalid and was reset.']);
   });
 });
