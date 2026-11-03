@@ -1,3 +1,5 @@
+import type { DiceStyle } from './diceStyle';
+
 export const SHAPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'] as const;
 export type DieShape = (typeof SHAPES)[number];
 
@@ -34,6 +36,8 @@ export interface DieDefinition {
   readonly shape: DieShape;
   readonly faces: readonly Face[];
   readonly custom: boolean;
+  /** How the die looks (custom dice keep their own; see styleOf). Never affects results. */
+  readonly style?: DiceStyle;
 }
 
 export function numberFaces(count: number): Face[] {
