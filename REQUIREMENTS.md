@@ -74,7 +74,20 @@ _Status: v1 · Last updated: 2026-11-03_
 - A **Clear** button empties the history.
 - History is **not persisted**; it clears on page reload.
 
-### 3.5 Possible Future Features (not in v1)
+### 3.5 Dice Appearance (milestone 11)
+
+- Each **standard die type** (d4 … d100) has its own style, e.g. a red d20 and blue d6s.
+- Each **custom die** has its own style, set in the custom-dice editor, so a replacement die can match the original.
+- A style has:
+  - a **body colour**;
+  - a **label colour** (numbers and text), chosen automatically for contrast or set by the user, with a warning when it would be hard to read;
+  - a **pattern** drawn behind the labels. Proposed: solid, marble, speckled, two-colour swirl, stripes, gradient (to be confirmed);
+  - a **finish**: matte, glossy, or metallic.
+- Ready-made presets (e.g. Ivory, Obsidian, Ruby marble, Ocean speckle, Gold) plus free choice.
+- An **Appearance** dialog with a live 3D preview of the die being styled.
+- Styles are saved in the browser (with the custom dice) and are purely visual: they never affect results or fairness.
+
+### 3.6 Possible Future Features (not in v1)
 
 - Saved group presets
 - Advantage/disadvantage, keep highest/lowest, exploding dice
@@ -97,7 +110,8 @@ _Status: v1 · Last updated: 2026-11-03_
 
 ## 5. UI / UX
 
-- **Look & feel:** Clean and minimal for now; we'll revisit the visual style later.
+- **Look & feel:** Clean and minimal.
+- **Theme:** Dark by default, with a **Dark / Light / System** switch (System follows the device setting). The choice is saved in the browser and applied before the page first paints. Both themes meet the contrast requirement (decided in milestone 9).
 - **Layout:**
   - A 3D dice area (the "table") takes up most of the screen.
   - A dice button bar: d4 … d100, plus saved custom dice.
@@ -146,8 +160,8 @@ _Status: v1 · Last updated: 2026-11-03_
 
 ## 7. Open Questions
 
-- **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors).
-- **Theme:** Light, dark, or follow the system setting?
+- **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors). Partly answered: dark theme (milestone 10) and dice styles (milestone 11).
+- **Dice patterns:** Confirm the pattern list in 3.5 (or add looks such as glitter, wood, stone).
 
 ## 8. Milestones
 
@@ -162,3 +176,6 @@ _Status: v1 · Last updated: 2026-11-03_
 8. **Fairness and performance:** Headless physics fairness harness with chi-square tests, physics tuning, mobile performance check with 20 dice.
    - Done: see [docs/fairness-report.md](docs/fairness-report.md) and [docs/performance.md](docs/performance.md). Dice now start spread over the whole table (20 dice settle in about 2.5 s), the d100 uses a ball shape against other dice for speed, and its numbers are shuffled onto its faces before every throw for fairness.
 9. **Review:** Full test pass and a walkthrough with you, then revisit visual style and the open questions.
+   - Done: see [docs/walkthrough.md](docs/walkthrough.md). Hosting decided (GitHub Pages), theme decided (dark by default with a switch), dice styles planned.
+10. **Dark theme:** Dark / Light / System switch (dark by default), themed colours for the whole UI and the table, saved choice applied before first paint, contrast checks in both themes.
+11. **Dice appearance:** Styles per standard die type and per custom die (colour, label colour, pattern, finish), presets, Appearance dialog with a 3D preview, persistence, performance check.
