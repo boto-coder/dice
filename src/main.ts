@@ -1,5 +1,6 @@
 import './style.css';
 import { mountApp } from './app';
+import { createDiePreview } from './render/preview';
 import { createDiceTable } from './render/table';
 
 const root = document.querySelector<HTMLElement>('#app');
@@ -15,7 +16,11 @@ function browserStorage(): Storage | null {
   }
 }
 
-mountApp(root, { createTable: (el) => createDiceTable(el), storage: browserStorage() });
+mountApp(root, {
+  createTable: (el) => createDiceTable(el),
+  createPreview: (el) => createDiePreview(el),
+  storage: browserStorage(),
+});
 
 // Offline support: the service worker only exists in production builds.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
