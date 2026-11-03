@@ -31,7 +31,7 @@ function expectValid({ values, total }: Awaited<ReturnType<typeof rollResult>>) 
 }
 
 test('loads the app shell', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page).toHaveTitle('Dice Roller');
   await expect(page.getByRole('heading', { level: 1, name: 'Dice Roller' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Dice table' }).locator('canvas')).toBeVisible();
@@ -39,7 +39,7 @@ test('loads the app shell', async ({ page }) => {
 });
 
 test('builds a group in the tray, rolls it, and rolls it again', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await add(page, 'd6', 2);
   await add(page, 'd10');
   const tray = page.getByRole('region', { name: 'Tray' });
@@ -69,7 +69,7 @@ test('builds a group in the tray, rolls it, and rolls it again', async ({ page }
 });
 
 test('rolls every die shape at once', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   for (const die of Object.keys(SIDES)) await add(page, die);
   await page.getByRole('button', { name: 'Roll', exact: true }).click();
   const result = await rollResult(page, 15_000);
@@ -78,7 +78,7 @@ test('rolls every die shape at once', async ({ page }) => {
 });
 
 test('rolls a full tray of 20 dice', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await add(page, 'd6', 20);
   await expect(page.getByRole('button', { name: 'Add d6 to tray' })).toBeDisabled();
   await expect(page.getByRole('region', { name: 'Tray' })).toContainText('The tray is full');
@@ -89,7 +89,7 @@ test('rolls a full tray of 20 dice', async ({ page }) => {
 });
 
 test('can be used with the keyboard only', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Add d8 to tray' }).focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
@@ -101,7 +101,7 @@ test('can be used with the keyboard only', async ({ page }) => {
 });
 
 test('has no automatically detectable accessibility violations', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await add(page, 'd20');
   await add(page, 'd6');
   await page.getByRole('button', { name: 'Roll', exact: true }).click();
@@ -115,7 +115,7 @@ test('has no automatically detectable accessibility violations', async ({ page }
 test('keeps the controls under the table when the history is long', async ({ page }) => {
   test.skip(page.viewportSize()!.width < 900, 'only the desktop layout has a side column');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await page.goto('./');
   await add(page, 'd6');
   const history = page.locator('details.history');
   if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
