@@ -1,3 +1,6 @@
+import { SHAPES } from './dice';
+import { parseStyle, type DiceStyle, type StandardDiceStyles } from './diceStyle';
+
 /** What the user picked in the theme switch. */
 export type ThemeChoice = 'dark' | 'light' | 'system';
 /** The theme actually shown. */
@@ -11,9 +14,22 @@ export const SETTINGS_VERSION = 1;
 
 export interface Settings {
   readonly theme: ThemeChoice;
+  /** Styles of the standard dice (custom dice keep theirs with the dice). */
+  readonly dice: StandardDiceStyles;
 }
 
-export const DEFAULT_SETTINGS: Settings = { theme: DEFAULT_THEME };
+export const DEFAULT_SETTINGS: Settings = { theme: DEFAULT_THEME, dice: {} };
+
+/** Keeps the valid style entries of standard dice; anything else is dropped. */
+function parseDiceStyles(x: unknown): StandardDiceStyles {
+  if (typeof x !== 'object' || x === null || Array.isArray(x)) return {};
+  const styles: Partial<Record<(typeof SHAPES)[number], DiceStyle>> = {};
+  for (const shape of SHAPES) {
+    const style = parseStyle((x as Record<string, unknown>)[shape]);
+    if (style) styles[shape] = style;
+  }
+  return styles;
+}
 
 export function isThemeChoice(x: unknown): x is ThemeChoice {
   return typeof x === 'string' && (THEME_CHOICES as readonly string[]).includes(x);
@@ -46,7 +62,10 @@ export function loadSettings(storage: Pick<Storage, 'getItem'>): Settings {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) return DEFAULT_SETTINGS;
   const record = data as Record<string, unknown>;
   if (record.version !== SETTINGS_VERSION) return DEFAULT_SETTINGS;
-  return { theme: isThemeChoice(record.theme) ? record.theme : DEFAULT_THEME };
+  return {
+    theme: isThemeChoice(record.theme) ? record.theme : DEFAULT_THEME,
+    dice: parseDiceStyles(record.dice),
+  };
 }
 
 /** Saves settings. Returns false if storage is unavailable or full. */
