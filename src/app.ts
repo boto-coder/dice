@@ -18,14 +18,22 @@ import {
   type Tray,
 } from './core/tray';
 import { loadCustomDice, saveCustomDice } from './core/storage';
+import {
+  DEFAULT_SETTINGS,
+  isThemeChoice,
+  loadSettings,
+  saveSettings,
+  type Settings,
+} from './core/settings';
 import type { DiceTable } from './render/table';
 import { createCustomDiceManager } from './ui/customDiceManager';
+import { createThemeController, themeSwitchMarkup } from './ui/theme';
 import { el, renderHistory, renderResults, renderTray } from './ui/views';
 
 export interface AppDeps {
   /** Creates the 3D table inside the given element. May throw if WebGL is unavailable. */
   createTable: (container: HTMLElement) => DiceTable;
-  /** Where custom dice are saved (localStorage in the browser). Omit for no persistence. */
+  /** Where custom dice and settings are saved (localStorage in the browser). Omit for no persistence. */
   storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
 }
 
@@ -57,6 +65,7 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
     <main class="app">
       <header class="app__header">
         <h1 class="app__title">Dice Roller</h1>
+        ${themeSwitchMarkup()}
       </header>
       <section class="table" aria-label="Dice table"></section>
       <section class="results" aria-labelledby="results-title">
@@ -138,8 +147,22 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
   let rolling = false;
   let table: DiceTable | null = null;
 
+  let settings: Settings = deps.storage ? loadSettings(deps.storage) : DEFAULT_SETTINGS;
+  const themeRadios = [...root.querySelectorAll<HTMLInputElement>('input[name="theme"]')];
+  const theme = createThemeController(document, settings.theme, (shown) => table?.setTheme(shown));
+  for (const radio of themeRadios) {
+    radio.checked = radio.value === settings.theme;
+    radio.addEventListener('change', () => {
+      if (!radio.checked || !isThemeChoice(radio.value)) return;
+      settings = { ...settings, theme: radio.value };
+      theme.set(radio.value);
+      if (deps.storage) saveSettings(deps.storage, settings);
+    });
+  }
+
   try {
     table = deps.createTable(tableEl);
+    table.setTheme(theme.theme);
   } catch {
     tableEl.classList.add('table--unsupported');
     tableEl.textContent = NO_WEBGL;
@@ -303,6 +326,7 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
 
   return {
     dispose() {
+      theme.dispose();
       table?.dispose();
       root.innerHTML = '';
     },
