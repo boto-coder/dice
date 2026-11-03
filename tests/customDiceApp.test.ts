@@ -25,6 +25,7 @@ let resolveRoll: (faces: number[]) => void;
 const table = {
   roll: vi.fn<DiceTable['roll']>(() => new Promise((res) => (resolveRoll = res))),
   highlight: vi.fn(),
+  setTheme: vi.fn(),
   dispose: vi.fn(),
 } satisfies DiceTable;
 
