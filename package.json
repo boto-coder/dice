@@ -16,7 +16,6 @@
     "test:unit": "vitest run --coverage --exclude 'tests/fairness/**'",
     "test:fairness": "vitest run tests/fairness --coverage.enabled=false",
     "test:firefox": "ALL_BROWSERS=1 playwright test --project=desktop-firefox",
-    "test:webkit": "ALL_BROWSERS=1 playwright test --project=desktop-webkit --project=mobile-webkit",
     "test:watch": "vitest --exclude 'tests/fairness/**'",
     "test:e2e": "playwright test",
     "fairness": "FAIRNESS_REPORT=1 vitest run tests/fairness/report.test.ts --coverage.enabled=false && prettier --write docs/fairness-report.md",
