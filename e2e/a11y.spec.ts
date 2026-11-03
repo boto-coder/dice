@@ -11,7 +11,7 @@ test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
   test('shows the settled dice at once instead of animating the throw', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('./');
     for (let i = 0; i < 10; i++) await page.getByRole('button', { name: 'Add d6 to tray' }).click();
     const start = Date.now();
     await page.getByRole('button', { name: 'Roll', exact: true }).click();
@@ -23,7 +23,7 @@ test.describe('reduced motion', () => {
 });
 
 test('every control can be reached with Tab, in a sensible order', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Add d4 to tray' }).click();
   await page.getByRole('button', { name: 'Roll', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText(/Total/, { timeout: 10_000 });
@@ -64,14 +64,14 @@ test('every control can be reached with Tab, in a sensible order', async ({ page
 });
 
 test('shows a visible focus ring on keyboard focus', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.keyboard.press('Tab');
   const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
   expect(outline).toBe('solid');
 });
 
 test('the custom dice dialog works from the keyboard and traps focus', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Manage' }).focus();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog', { name: 'Custom dice' });
@@ -106,7 +106,7 @@ test('the custom dice dialog works from the keyboard and traps focus', async ({ 
 });
 
 test('announces results in a polite live region', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   const status = page.getByRole('status');
   await expect(status).toHaveAttribute('aria-live', 'polite');
   await page.getByRole('button', { name: 'Add d8 to tray' }).click();
