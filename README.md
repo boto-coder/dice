@@ -45,12 +45,17 @@ npm run build && npm run preview
 The page has a Dark (default) / Light / System theme switch. Colours are CSS variables in
 `src/style.css`; `index.html` applies the saved theme before the first paint.
 
+Each die type, and each custom die, can have its own look (colour, pattern, finish and
+number colour), chosen in the Appearance dialog or the custom-dice editor. Looks never change
+results: rolls come from the physics and the face-reading only.
+
 App icons are rendered from `public/icon.svg` with `node scripts/icons.mjs`.
 Milestone screenshots are taken with `node scripts/screenshots.mjs` (see the
 usage notes at the top of the script).
 
 Frame rates while rolling 20 dice are measured with `node scripts/perf.mjs`
-against `npm run preview` (results in `docs/performance.md`).
+against `npm run preview` (results in `docs/performance.md`); add `--styled` to give
+every die type a different look.
 
 ## Deployment
 
