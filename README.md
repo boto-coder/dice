@@ -42,6 +42,9 @@ phone, serve the build over HTTPS (or use `localhost` on the same device):
 npm run build && npm run preview
 ```
 
+The page has a Dark (default) / Light / System theme switch. Colours are CSS variables in
+`src/style.css`; `index.html` applies the saved theme before the first paint.
+
 App icons are rendered from `public/icon.svg` with `node scripts/icons.mjs`.
 Milestone screenshots are taken with `node scripts/screenshots.mjs` (see the
 usage notes at the top of the script).
