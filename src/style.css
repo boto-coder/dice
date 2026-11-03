@@ -5,8 +5,82 @@
     'Segoe UI',
     Roboto,
     sans-serif;
-  color: #1f2328;
-  background: #f6f7f9;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ---------- Themes ----------
+   Dark is the default; index.html sets data-theme before the first paint.
+   Both themes keep text at 4.5:1 contrast or more (checked by the axe tests). */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0f1216;
+  --dialog-bg: #161b22;
+  --text: #e6edf3;
+  --muted: #9da7b3;
+  --surface: #1b2027;
+  --surface-hover: #262c35;
+  --border: #3a424d;
+  --border-strong: #545e6b;
+  --border-soft: #2d343d;
+  --focus: #4493f8;
+  --primary-bg: #e6edf3;
+  --primary-hover: #c5ced8;
+  --primary-text: #0f1216;
+  --danger-bg: #b62324;
+  --danger-hover: #8e1519;
+  --danger-text: #ffffff;
+  --success-bg: #12301c;
+  --success-border: #3fb950;
+  --success-text: #56d364;
+  --success-ring: rgb(63 185 80 / 30%);
+  --failure-bg: #3b1518;
+  --failure-border: #f85149;
+  --failure-text: #ff7b72;
+  --failure-ring: rgb(248 81 73 / 30%);
+  --notice-bg: #3a2e0b;
+  --notice-border: #bb8009;
+  --backdrop: rgb(0 0 0 / 60%);
+  --dialog-shadow: rgb(0 0 0 / 60%);
+  /* A dark green felt, like a games table. */
+  --table-bg: #1d3a2f;
+  --table-ring: #2b4c3f;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --dialog-bg: #f6f7f9;
+  --text: #1f2328;
+  --muted: #57606a;
+  --surface: #ffffff;
+  --surface-hover: #f3f4f6;
+  --border: #d0d7de;
+  --border-strong: #afb8c1;
+  --border-soft: #e1e4e8;
+  --focus: #0969da;
+  --primary-bg: #1f2328;
+  --primary-hover: #32383f;
+  --primary-text: #ffffff;
+  --danger-bg: #cf222e;
+  --danger-hover: #a40e26;
+  --danger-text: #ffffff;
+  --success-bg: #dafbe1;
+  --success-border: #1a7f37;
+  --success-text: #116329;
+  --success-ring: rgb(26 127 55 / 25%);
+  --failure-bg: #ffebe9;
+  --failure-border: #cf222e;
+  --failure-text: #a40e26;
+  --failure-ring: rgb(207 34 46 / 25%);
+  --notice-bg: #fff8c5;
+  --notice-border: #d4a72c;
+  --backdrop: rgb(31 35 40 / 45%);
+  --dialog-shadow: rgb(0 0 0 / 25%);
+  --table-bg: #e9ecf0;
+  --table-ring: #dde1e6;
 }
 
 * {
@@ -52,6 +126,58 @@ body {
 
 .app__header {
   grid-area: header;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+/* ---------- Theme switch (segmented radio group) ---------- */
+
+.theme-switch {
+  display: inline-flex;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.theme-switch__option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* The native radio stays in the page (for keyboards and screen readers) but is invisible. */
+.theme-switch__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.theme-switch__option:hover {
+  color: var(--text);
+}
+
+.theme-switch__option:has(:checked) {
+  background: var(--primary-bg);
+  color: var(--primary-text);
+}
+
+.theme-switch__option:has(:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .app__title {
@@ -65,8 +191,8 @@ body {
   position: relative;
   height: clamp(240px, 44vh, 560px);
   border-radius: 14px;
-  background: #e9ecf0;
-  box-shadow: inset 0 0 0 1px #dde1e6;
+  background: var(--table-bg);
+  box-shadow: inset 0 0 0 1px var(--table-ring);
   overflow: hidden;
 }
 
@@ -81,7 +207,7 @@ body {
   place-items: center;
   padding: 1rem;
   text-align: center;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .results {
@@ -112,7 +238,7 @@ body {
   position: sticky;
   bottom: 0;
   padding: 0.5rem 0 max(0.75rem, env(safe-area-inset-bottom));
-  background: linear-gradient(to top, #f6f7f9 75%, rgb(246 247 249 / 0%));
+  background: linear-gradient(to top, var(--bg) 75%, transparent);
   z-index: 1;
 }
 
@@ -169,20 +295,20 @@ body {
   min-height: 44px;
   padding: 0.6rem 1rem;
   border-radius: 10px;
-  border: 1px solid #d0d7de;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: inherit;
   cursor: pointer;
 }
 
 .btn:hover:not([aria-disabled='true']) {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .btn:focus-visible,
 .chip:focus-visible,
 .history__summary:focus-visible {
-  outline: 3px solid #0969da;
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -203,13 +329,13 @@ body {
 }
 
 .btn--primary {
-  background: #1f2328;
-  border-color: #1f2328;
-  color: #fff;
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-text);
 }
 
 .btn--primary:hover:not([aria-disabled='true']) {
-  background: #32383f;
+  background: var(--primary-hover);
 }
 
 /* ---------- Results ---------- */
@@ -229,7 +355,7 @@ body {
 
 .results__hint {
   margin: 0;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .results__dice {
@@ -248,13 +374,13 @@ body {
   min-width: 3rem;
   padding: 0.25rem 0.5rem;
   border-radius: 10px;
-  background: #fff;
-  border: 1px solid #d0d7de;
+  background: var(--surface);
+  border: 1px solid var(--border);
 }
 
 .die-result__name {
   font-size: 0.75rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .die-result__value {
@@ -270,17 +396,17 @@ body {
 }
 
 .die-result--success {
-  background: #dafbe1;
-  border-color: #1a7f37;
-  color: #116329;
-  box-shadow: 0 0 0 3px rgb(26 127 55 / 25%);
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+  box-shadow: 0 0 0 3px var(--success-ring);
 }
 
 .die-result--failure {
-  background: #ffebe9;
-  border-color: #cf222e;
-  color: #a40e26;
-  box-shadow: 0 0 0 3px rgb(207 34 46 / 25%);
+  background: var(--failure-bg);
+  border-color: var(--failure-border);
+  color: var(--failure-text);
+  box-shadow: 0 0 0 3px var(--failure-ring);
 }
 
 .die-result--success .die-result__name,
@@ -291,12 +417,12 @@ body {
 .results__total {
   margin: 0;
   font-size: 1rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .results__total-value {
   font-size: 2rem;
-  color: #1f2328;
+  color: var(--text);
   margin-left: 0.25rem;
 }
 
@@ -315,7 +441,7 @@ body {
 
 .tray__count {
   flex: 1;
-  color: #57606a;
+  color: var(--muted);
   font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -342,25 +468,25 @@ body {
   min-width: 44px;
   padding: 0.3rem 0.65rem;
   border-radius: 999px;
-  border: 1px solid #afb8c1;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
   color: inherit;
   cursor: pointer;
 }
 
 .chip::after {
   content: ' ×';
-  color: #57606a;
+  color: var(--muted);
 }
 
 .chip:hover {
-  border-color: #cf222e;
+  border-color: var(--failure-border);
 }
 
 .tray__hint {
   margin: 0.4rem 0 0;
   font-size: 0.875rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 /* ---------- History ---------- */
@@ -372,7 +498,7 @@ body {
 }
 
 .history__count {
-  color: #57606a;
+  color: var(--muted);
   font-weight: 400;
 }
 
@@ -400,8 +526,8 @@ body {
 .history__entry {
   padding: 0.5rem 0.65rem;
   border-radius: 10px;
-  background: #fff;
-  border: 1px solid #e1e4e8;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
 }
 
 .history__head {
@@ -412,7 +538,7 @@ body {
 }
 
 .history__group {
-  color: #57606a;
+  color: var(--muted);
 }
 
 .history__total {
@@ -430,16 +556,16 @@ body {
 }
 
 .history__value--success {
-  color: #116329;
+  color: var(--success-text);
 }
 
 .history__value--failure {
-  color: #a40e26;
+  color: var(--failure-text);
 }
 
 .history__empty {
   margin: 0;
-  color: #57606a;
+  color: var(--muted);
 }
 
 /* ---------- Custom dice bar ---------- */
@@ -477,7 +603,7 @@ body {
 .custom__empty {
   margin: 0.4rem 0 0;
   font-size: 0.875rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .chip,
@@ -489,13 +615,13 @@ body {
 }
 
 .btn--danger {
-  background: #cf222e;
-  border-color: #cf222e;
-  color: #fff;
+  background: var(--danger-bg);
+  border-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .btn--danger:hover:not([aria-disabled='true']) {
-  background: #a40e26;
+  background: var(--danger-hover);
 }
 
 .btn--icon {
@@ -511,13 +637,13 @@ body {
   padding: 1rem 1.25rem 1.25rem;
   border: none;
   border-radius: 14px;
-  background: #f6f7f9;
+  background: var(--dialog-bg);
   color: inherit;
-  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+  box-shadow: 0 20px 60px var(--dialog-shadow);
 }
 
 .dialog::backdrop {
-  background: rgb(31 35 40 / 45%);
+  background: var(--backdrop);
 }
 
 .dialog__header {
@@ -537,15 +663,15 @@ body {
   margin: 0 0 0.75rem;
   padding: 0.5rem 0.75rem;
   border-radius: 10px;
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
+  background: var(--notice-bg);
+  border: 1px solid var(--notice-border);
   font-size: 0.875rem;
 }
 
 .manager__intro,
 .manager__empty {
   margin: 0 0 0.75rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .manager__list {
@@ -569,8 +695,8 @@ body {
   gap: 0.5rem;
   padding: 0.5rem 0.65rem;
   border-radius: 10px;
-  background: #fff;
-  border: 1px solid #e1e4e8;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
 }
 
 .manager__info {
@@ -587,7 +713,7 @@ body {
 
 .manager__meta {
   font-size: 0.875rem;
-  color: #57606a;
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
@@ -626,8 +752,8 @@ body {
   min-height: 44px;
   padding: 0.4rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid #afb8c1;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
   color: inherit;
 }
 
@@ -637,18 +763,18 @@ select.field__input {
 }
 
 .field__input:focus-visible {
-  outline: 3px solid #0969da;
+  outline: 3px solid var(--focus);
   outline-offset: 1px;
 }
 
 .field__input[aria-invalid='true'] {
-  border-color: #cf222e;
-  box-shadow: 0 0 0 1px #cf222e;
+  border-color: var(--failure-border);
+  box-shadow: 0 0 0 1px var(--failure-border);
 }
 
 .field__error {
   margin: 0.25rem 0 0;
-  color: #a40e26;
+  color: var(--failure-text);
   font-size: 0.875rem;
   font-weight: 600;
 }
@@ -666,7 +792,7 @@ select.field__input {
 .editor__help {
   margin: 0 0 0.5rem;
   font-size: 0.875rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .editor__faces {
@@ -688,7 +814,7 @@ select.field__input {
   min-width: 1.5rem;
   text-align: right;
   font-size: 0.875rem;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .editor__face-input {
