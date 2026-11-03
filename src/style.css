@@ -125,7 +125,9 @@ body {
   .app {
     padding: 1.5rem 1.5rem 0;
     grid-template-columns: minmax(0, 1fr) 300px;
-    grid-template-rows: auto auto 1fr auto auto auto auto;
+    /* The last, empty row absorbs a long history, so it never pushes the
+       controls away from the table. */
+    grid-template-rows: auto auto auto auto auto auto auto 1fr;
     grid-template-areas:
       'header  header'
       'table   results'
@@ -133,7 +135,8 @@ body {
       'dice    history'
       'custom  history'
       'tray    history'
-      'actions history';
+      'actions history'
+      '.       history';
     column-gap: 1.5rem;
   }
 
