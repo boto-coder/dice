@@ -63,6 +63,9 @@ for (const { name, context } of targets) {
   });
   const status = (await page.getByRole('status').textContent()) ?? '';
   check('rolls', /Total: \d+\.$/.test(status), status);
+  // Clicking Roll can scroll the page; the sticky Roll bar would then cover the
+  // tray in a full-page capture.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: file('3-result'), fullPage: true });
 
   // The service worker installs on the first visit; then the app must load offline.
