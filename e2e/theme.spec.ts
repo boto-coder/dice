@@ -60,7 +60,7 @@ test('the switch works with the keyboard as one radio group', async ({ page }) =
   await expect(radio(page, 'Light')).toBeChecked();
   await expect(radio(page, 'Light')).toBeFocused();
   expect(await theme(page)).toBe('light');
-  // Tab leaves the group in one step, to the first die button.
+  // Tab leaves the group in one step, to the dice Appearance button.
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Add d4 to tray' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Appearance' })).toBeFocused();
 });
