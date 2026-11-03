@@ -1,4 +1,5 @@
-import { STANDARD_DICE, findDie, type DieDefinition } from './core/dice';
+import { SHAPES, STANDARD_DICE, findDie, type DieDefinition } from './core/dice';
+import { DEFAULT_STYLE, sameStyle, styleOf, type DiceStyle } from './core/diceStyle';
 import {
   EMPTY_HISTORY,
   addHistoryEntry,
@@ -26,7 +27,9 @@ import {
   type Settings,
 } from './core/settings';
 import type { DiceTable } from './render/table';
+import { createAppearanceDialog } from './ui/appearanceDialog';
 import { createCustomDiceManager } from './ui/customDiceManager';
+import type { CreatePreview } from './ui/styleEditor';
 import { createThemeController, themeSwitchMarkup } from './ui/theme';
 import { el, renderHistory, renderResults, renderTray } from './ui/views';
 
@@ -35,6 +38,8 @@ export interface AppDeps {
   createTable: (container: HTMLElement) => DiceTable;
   /** Where custom dice and settings are saved (localStorage in the browser). Omit for no persistence. */
   storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
+  /** Creates the 3D die preview in the style editors. Omit for none. */
+  createPreview?: CreatePreview;
 }
 
 export interface AppHandle {
@@ -73,12 +78,18 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
         <div class="results__body"></div>
         <p class="visually-hidden" role="status" aria-live="polite"></p>
       </section>
-      <div class="dice-bar" role="group" aria-label="Add dice">
-        ${STANDARD_DICE.map(
-          (d) =>
-            `<button type="button" class="btn btn--die" data-add="${d.id}" aria-label="Add ${d.name} to tray">${d.name}</button>`,
-        ).join('')}
-      </div>
+      <section class="dice" aria-labelledby="dice-title">
+        <div class="dice__header">
+          <h2 class="dice__title" id="dice-title">Dice</h2>
+          <button type="button" class="btn btn--small" data-action="appearance">Appearance</button>
+        </div>
+        <div class="dice-bar" role="group" aria-label="Add dice">
+          ${STANDARD_DICE.map(
+            (d) =>
+              `<button type="button" class="btn btn--die" data-add="${d.id}" aria-label="Add ${d.name} to tray">${d.name}</button>`,
+          ).join('')}
+        </div>
+      </section>
       <section class="custom" aria-labelledby="custom-title">
         <div class="custom__header">
           <h2 class="custom__title" id="custom-title">Custom dice</h2>
@@ -131,6 +142,7 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
   const customBar = q<HTMLElement>('.custom__bar');
   const customEmpty = q<HTMLElement>('.custom__empty');
   const manageButton = q<HTMLButtonElement>('[data-action="manage"]');
+  const appearanceButton = q<HTMLButtonElement>('[data-action="appearance"]');
 
   // Open history by default where there is room for it next to the table.
   if (typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 900px)').matches) {
@@ -159,6 +171,14 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
       if (deps.storage) saveSettings(deps.storage, settings);
     });
   }
+
+  /** A die with the style it is drawn in. */
+  const styled = (die: DieDefinition): DieDefinition => ({
+    ...die,
+    style: styleOf(die, settings.dice),
+  });
+  /** Lets the table prepare the textures of every die the user can roll. */
+  const prepareDice = (): void => table?.prepare([...STANDARD_DICE, ...customDice].map(styled));
 
   try {
     table = deps.createTable(tableEl);
@@ -222,9 +242,11 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
     }
     renderCustomBar();
     updateTray();
+    prepareDice();
   }
 
   const manager = createCustomDiceManager(root.querySelector('main')!, {
+    createPreview: deps.createPreview,
     getDice: () => customDice,
     onSave(die) {
       const index = customDice.findIndex((d) => d.id === die.id);
@@ -237,6 +259,42 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
       customDiceChanged();
     },
   });
+  function saveStandardStyles(dice: Partial<Record<(typeof SHAPES)[number], DiceStyle>>): void {
+    settings = { ...settings, dice };
+    if (deps.storage) saveSettings(deps.storage, settings);
+    prepareDice();
+  }
+
+  /** The default look is not stored, so dice without a chosen look stay as they were. */
+  const chosen = (style: DiceStyle): DiceStyle | undefined =>
+    sameStyle(style, DEFAULT_STYLE) ? undefined : style;
+
+  const appearance = createAppearanceDialog(root.querySelector('main')!, {
+    createPreview: deps.createPreview,
+    getStandardStyles: () => settings.dice,
+    getCustomDice: () => customDice,
+    onStandardStyle(id, style) {
+      const dice = { ...settings.dice };
+      const kept = chosen(style);
+      if (kept) dice[id] = kept;
+      else delete dice[id];
+      saveStandardStyles(dice);
+    },
+    onAllStandard(style) {
+      const kept = chosen(style);
+      saveStandardStyles(kept ? Object.fromEntries(SHAPES.map((s) => [s, kept])) : {});
+    },
+    onCustomStyle(id, style) {
+      const kept = chosen(style);
+      customDice = customDice.map((d) => {
+        if (d.id !== id) return d;
+        const plain = { id: d.id, name: d.name, shape: d.shape, faces: d.faces, custom: d.custom };
+        return kept ? { ...plain, style: kept } : plain;
+      });
+      customDiceChanged();
+    },
+  });
+
   if (loaded.warnings.length > 0) manager.setNotice(loaded.warnings.join(' '));
   else if (deps.storage === null) manager.setNotice(SAVE_FAILED);
 
@@ -246,7 +304,10 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
 
   async function roll(group: Tray): Promise<void> {
     if (!table || rolling) return;
-    const dice = group.map((d) => lookup(d.dieId)).filter((d) => d !== undefined);
+    const dice = group
+      .map((d) => lookup(d.dieId))
+      .filter((d) => d !== undefined)
+      .map(styled);
     if (dice.length === 0) return;
     rolling = true;
     lastGroup = group;
@@ -287,6 +348,7 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
   });
 
   manageButton.addEventListener('click', () => manager.open());
+  appearanceButton.addEventListener('click', () => appearance.open());
 
   trayList.addEventListener('click', (event) => {
     const chip = (event.target as Element).closest<HTMLButtonElement>('button[data-uid]');
@@ -320,6 +382,7 @@ export function mountApp(root: HTMLElement, deps: AppDeps): AppHandle {
   });
 
   showResult(null);
+  prepareDice();
   renderCustomBar();
   updateTray();
   updateHistory();
