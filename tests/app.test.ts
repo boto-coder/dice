@@ -20,6 +20,7 @@ function fakeTable() {
         }),
     ),
     highlight: vi.fn(),
+    setTheme: vi.fn(),
     dispose: vi.fn(),
   } satisfies DiceTable;
   return {
@@ -331,5 +332,67 @@ describe('lifecycle', () => {
     mount();
     mount();
     expect(root.querySelectorAll('main')).toHaveLength(1);
+  });
+});
+
+describe('theme switch', () => {
+  class MemoryStorage {
+    data = new Map<string, string>();
+    getItem(key: string): string | null {
+      return this.data.get(key) ?? null;
+    }
+    setItem(key: string, value: string): void {
+      this.data.set(key, value);
+    }
+  }
+  const themeGroup = () => getByRole(root, 'group', { name: 'Theme' });
+  const radio = (name: string) => getByRole(themeGroup(), 'radio', { name });
+
+  it('starts dark, with Dark selected', () => {
+    const { table } = mount();
+    expect(radio('Dark')).toBeChecked();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(table.setTheme).toHaveBeenCalledWith('dark');
+  });
+
+  it('switches the page and the table, and saves the choice', async () => {
+    const storage = new MemoryStorage();
+    const fake = fakeTable();
+    mountApp(root, { createTable: () => fake.table, storage });
+    const user = userEvent.setup();
+
+    await user.click(radio('Light'));
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(fake.table.setTheme).toHaveBeenLastCalledWith('light');
+    expect(JSON.parse(storage.getItem('dice-roller:settings')!)).toMatchObject({
+      theme: 'light',
+    });
+
+    // Without matchMedia (jsdom), System counts as dark.
+    await user.click(radio('System'));
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(JSON.parse(storage.getItem('dice-roller:settings')!)).toMatchObject({
+      theme: 'system',
+    });
+  });
+
+  it('restores the saved choice', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('dice-roller:settings', JSON.stringify({ version: 1, theme: 'light' }));
+    const fake = fakeTable();
+    mountApp(root, { createTable: () => fake.table, storage });
+    expect(radio('Light')).toBeChecked();
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(fake.table.setTheme).toHaveBeenCalledWith('light');
+  });
+
+  it('still works when the 3D table is unavailable', async () => {
+    mountApp(root, {
+      createTable: () => {
+        throw new Error('no WebGL');
+      },
+    });
+    await userEvent.setup().click(radio('Light'));
+    expect(document.documentElement.dataset.theme).toBe('light');
   });
 });
