@@ -12,6 +12,9 @@ const otherBrowsers = process.env.ALL_BROWSERS
     ]
   : [];
 
+// BASE_PATH=/dice/ tests the build exactly as it is served on GitHub Pages.
+const baseURL = `http://localhost:4173${process.env.BASE_PATH ?? '/'}`;
+
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
@@ -19,7 +22,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -29,7 +32,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run build && npm run preview',
-    url: 'http://localhost:4173',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
