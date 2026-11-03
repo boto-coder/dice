@@ -1,5 +1,6 @@
 // Measures frame rate while rolling a full tray of 20 mixed dice.
-// Usage: node scripts/perf.mjs [baseUrl] [--headed] [--profile]
+// Usage: node scripts/perf.mjs [baseUrl] [--headed] [--profile] [--styled]
+//   --styled gives each die type a different look (every pattern and finish).
 //   --profile prints the functions using the most CPU in the first 0.5 s of the second roll.
 //   Use a production build for realistic numbers: npm run build && npm run preview
 // Runs a Pixel 7 emulation at 1× and 4× CPU slowdown (4× ≈ a mid-range phone)
@@ -11,6 +12,29 @@ import { chromium, devices } from '@playwright/test';
 const args = process.argv.slice(2);
 const headed = args.includes('--headed');
 const profile = args.includes('--profile');
+const styled = args.includes('--styled');
+/** One look per die type, covering every pattern and finish. */
+const LOOKS = {
+  d4: { body: '#fbfbf8', accent: '#d9d6cc', label: 'auto', pattern: 'solid', finish: 'matte' },
+  d6: { body: '#8e1428', accent: '#e07a8c', label: 'auto', pattern: 'marble', finish: 'glossy' },
+  d8: { body: '#0b4f6c', accent: '#8fdcf5', label: 'auto', pattern: 'speckled', finish: 'matte' },
+  d10: {
+    body: '#d4a73a',
+    accent: '#fff0b3',
+    label: 'auto',
+    pattern: 'gradient',
+    finish: 'metallic',
+  },
+  d12: { body: '#1e5e3f', accent: '#2f8a5c', label: 'auto', pattern: 'swirl', finish: 'glossy' },
+  d20: { body: '#4b2a85', accent: '#7a52c0', label: 'auto', pattern: 'stripes', finish: 'glossy' },
+  d100: {
+    body: '#17171c',
+    accent: '#4a4a5c',
+    label: 'auto',
+    pattern: 'marble',
+    finish: 'metallic',
+  },
+};
 const baseUrl = args.find((a) => !a.startsWith('--')) ?? 'http://127.0.0.1:4173';
 const TRAY = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
 
@@ -43,6 +67,14 @@ const browser = await chromium.launch({ headless: !headed });
 for (const { name, context, cpu } of runs) {
   const ctx = await browser.newContext(context);
   const page = await ctx.newPage();
+  if (styled) {
+    await page.addInitScript(
+      (value) => {
+        localStorage.setItem('dice-roller:settings', value);
+      },
+      JSON.stringify({ version: 1, theme: 'dark', dice: LOOKS }),
+    );
+  }
   await page.goto(baseUrl);
   await page.waitForSelector('canvas');
   const renderer = await page.evaluate(() => {
