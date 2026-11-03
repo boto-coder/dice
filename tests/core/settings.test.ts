@@ -8,6 +8,7 @@ import {
   resolveTheme,
   saveSettings,
 } from '../../src/core/settings';
+import { PRESETS } from '../../src/core/diceStyle';
 
 class MemoryStorage {
   data = new Map<string, string>();
@@ -61,12 +62,13 @@ describe('loadSettings', () => {
 
   it('round-trips through saveSettings', () => {
     const s = new MemoryStorage();
-    expect(saveSettings(s, { theme: 'light' })).toBe(true);
+    expect(saveSettings(s, { theme: 'light', dice: {} })).toBe(true);
     expect(JSON.parse(s.getItem(SETTINGS_KEY)!)).toEqual({
       version: SETTINGS_VERSION,
       theme: 'light',
+      dice: {},
     });
-    expect(loadSettings(s)).toEqual({ theme: 'light' });
+    expect(loadSettings(s)).toEqual({ theme: 'light', dice: {} });
   });
 
   it.each([
@@ -83,12 +85,13 @@ describe('loadSettings', () => {
   it('falls back to the default theme for an invalid theme value', () => {
     expect(loadSettings(withRaw(JSON.stringify({ version: 1, theme: 'neon' })))).toEqual({
       theme: 'dark',
+      dice: {},
     });
   });
 
   it('ignores unknown extra fields', () => {
     const raw = JSON.stringify({ version: 1, theme: 'system', future: { x: 1 } });
-    expect(loadSettings(withRaw(raw))).toEqual({ theme: 'system' });
+    expect(loadSettings(withRaw(raw))).toEqual({ theme: 'system', dice: {} });
   });
 
   it('gives the defaults when storage is inaccessible', () => {
@@ -98,6 +101,38 @@ describe('loadSettings', () => {
 
 describe('saveSettings', () => {
   it('returns false when storage is unavailable or full', () => {
-    expect(saveSettings(throwing, { theme: 'dark' })).toBe(false);
+    expect(saveSettings(throwing, DEFAULT_SETTINGS)).toBe(false);
+  });
+});
+
+describe('standard dice styles', () => {
+  const gold = PRESETS.find((p) => p.id === 'gold')!.style;
+  const ocean = PRESETS.find((p) => p.id === 'ocean')!.style;
+
+  it('round-trips a style per standard die', () => {
+    const s = new MemoryStorage();
+    saveSettings(s, { theme: 'dark', dice: { d20: gold, d6: ocean } });
+    expect(loadSettings(s)).toEqual({ theme: 'dark', dice: { d20: gold, d6: ocean } });
+  });
+
+  it('drops invalid styles and unknown dice, keeping the rest', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      theme: 'light',
+      dice: { d20: gold, d6: { body: 'blue' }, d7: gold, custom: ocean },
+    });
+    expect(loadSettings(withRaw(raw))).toEqual({ theme: 'light', dice: { d20: gold } });
+  });
+
+  it('ignores a malformed dice field', () => {
+    for (const dice of ['gold', [gold], null]) {
+      const raw = JSON.stringify({ version: 1, theme: 'dark', dice });
+      expect(loadSettings(withRaw(raw))).toEqual({ theme: 'dark', dice: {} });
+    }
+  });
+
+  it('reads settings saved before dice styles existed', () => {
+    const raw = JSON.stringify({ version: 1, theme: 'light' });
+    expect(loadSettings(withRaw(raw))).toEqual({ theme: 'light', dice: {} });
   });
 });
