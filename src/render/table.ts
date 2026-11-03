@@ -14,6 +14,11 @@ export interface DiceTable {
   roll(dice: readonly DieDefinition[]): Promise<number[]>;
   /** Highlights settled dice (e.g. a natural 20 or 1), in the same order as the last roll. */
   highlight(marks: readonly Crit[]): void;
+  /**
+   * Prepares the textures of these (styled) dice while the browser is idle, so
+   * a roll with them doesn't stall. Replaces any earlier list still waiting.
+   */
+  prepare(dice: readonly DieDefinition[]): void;
   /** Adapts lighting and shadows to the page theme (the table colour itself is CSS). */
   setTheme(theme: Theme): void;
   dispose(): void;
@@ -101,6 +106,12 @@ export const TABLE_THEMES: Readonly<
   light: { shadowOpacity: 0.18, groundColor: 0xd8dce2 },
 };
 
+/**
+ * Light strengths. Measured with a flat die: a #8e1428 face pointing up
+ * renders about #9b333e, close to its real colour.
+ */
+export const LIGHTING = { sky: 2.2, sun: 1.6 } as const;
+
 export interface DiceTableOptions {
   rng?: Rng;
   /** Checked on every roll; defaults to the prefers-reduced-motion media query. */
@@ -125,9 +136,9 @@ export function createDiceTable(
   const camera = new THREE.PerspectiveCamera(VIEW.fov, 1, 0.1, 100);
   camera.up.set(0, 0, -1); // screen-up is the back of the table
 
-  const ambient = new THREE.HemisphereLight(0xffffff, 0xd8dce2, 2.2);
+  const ambient = new THREE.HemisphereLight(0xffffff, 0xd8dce2, LIGHTING.sky);
   scene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  const sun = new THREE.DirectionalLight(0xffffff, LIGHTING.sun);
   sun.position.set(-4, 15, 6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -209,29 +220,56 @@ export function createDiceTable(
   observer.observe(container);
   resize();
 
-  // Draw and upload the standard dice's label textures while the browser is
-  // idle, one die at a time, so the first roll doesn't stall on them.
+  // Draw and upload dice textures while the browser is idle, one die at a
+  // time, so a roll doesn't stall on them.
   const idle = (fn: () => void): void => {
     if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(fn);
     else setTimeout(fn, 50);
   };
   let disposed = false;
-  const warmUp = (index: number): void => {
-    if (disposed) return;
-    const die = STANDARD_DICE[index];
+  let queue: readonly DieDefinition[] = STANDARD_DICE;
+  let queueVersion = 0;
+  /** Finishes whose shaders are compiled (matte and the reflective ones differ). */
+  const compiledFinishes = new Set<string>();
+  const compileShaders = (): void => {
+    // One temporary die per finish not compiled yet, so no roll waits for a shader.
+    const samples = queue
+      .filter((d, i, all) => {
+        const finish = d.style?.finish ?? 'matte';
+        return (
+          !compiledFinishes.has(finish) &&
+          all.findIndex((o) => (o.style?.finish ?? 'matte') === finish) === i
+        );
+      })
+      .map((d) => {
+        compiledFinishes.add(d.style?.finish ?? 'matte');
+        return createDieMesh(d, polyhedronFor(d.shape));
+      });
+    if (samples.length === 0) return;
+    // A real frame (not just compile) also builds the shadow-map shader. The
+    // browser shows only the last frame drawn in a task, so the samples never appear.
+    for (const s of samples) s.position.y = 1;
+    scene.add(...samples);
+    render();
+    scene.remove(...samples);
+    render();
+    for (const s of samples) disposeDieMesh(s);
+  };
+  const warmUp = (version: number, index: number): void => {
+    if (disposed || version !== queueVersion) return;
+    const die = queue[index];
     if (!die) {
-      // Finally compile the dice shaders once, with a temporary die in the scene.
-      const sample = createDieMesh(STANDARD_DICE[1]!, polyhedronFor('d6'));
-      scene.add(sample);
-      renderer.compile(scene, camera);
-      scene.remove(sample);
-      disposeDieMesh(sample);
+      compileShaders();
       return;
     }
-    renderer.initTexture(dieAtlas(die, polyhedronFor(die.shape)).texture);
-    idle(() => warmUp(index + 1));
+    renderer.initTexture(dieAtlas(die, polyhedronFor(die.shape), die.style).texture);
+    idle(() => warmUp(version, index + 1));
   };
-  idle(() => warmUp(0));
+  const startWarmUp = (): void => {
+    const version = ++queueVersion;
+    idle(() => warmUp(version, 0));
+  };
+  startWarmUp();
 
   return {
     roll(dice) {
@@ -260,6 +298,10 @@ export function createDiceTable(
         pending = resolve;
         renderer.setAnimationLoop(frame);
       });
+    },
+    prepare(dice) {
+      queue = dice;
+      startWarmUp();
     },
     setTheme(theme) {
       const look = TABLE_THEMES[theme];
