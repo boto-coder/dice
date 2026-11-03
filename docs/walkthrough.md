@@ -42,9 +42,8 @@ Regenerate with `node scripts/screenshots.mjs m9 …` (the standard flow) and
 - **Fixed: the tab-order e2e test failed in Firefox** because Firefox keeps the last control
   focused when Tab leaves the page. The app itself was fine.
 - **Browsers:** all e2e tests pass in Chromium (desktop + Pixel 7) and Firefox
-  (`npm run test:firefox`). WebKit (Safari) could not run on this Arch-based machine: Playwright's
-  WebKit needs Ubuntu/macOS system libraries. `npm run test:webkit` is ready for a machine or CI
-  that has them.
+  (`npm run test:firefox`), run locally. Safari/WebKit is not tested
+  (decided in milestone 9: Chromium and Firefox are enough).
 - **For the visual-style pass:** pale emoji such as 🌫️ have low contrast on the white dice and
   tiles; the desktop side column is empty before the first roll; a long tray summary is cut off
   with "…" (the chips below show every die).
