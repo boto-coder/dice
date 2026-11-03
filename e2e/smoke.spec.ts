@@ -111,3 +111,22 @@ test('has no automatically detectable accessibility violations', async ({ page }
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 });
+
+test('keeps the controls under the table when the history is long', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 900, 'only the desktop layout has a side column');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await add(page, 'd6');
+  const history = page.locator('details.history');
+  if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
+  await page.getByRole('button', { name: 'Roll', exact: true }).click();
+  for (let i = 1; i < 20; i++) {
+    await expect(page.locator('.history__entry')).toHaveCount(i);
+    await page.getByRole('button', { name: 'Roll again' }).click();
+  }
+  await expect(page.locator('.history__entry')).toHaveCount(20);
+
+  const table = (await page.getByRole('region', { name: 'Dice table' }).boundingBox())!;
+  const diceBar = (await page.getByRole('group', { name: 'Add dice' }).boundingBox())!;
+  expect(diceBar.y - (table.y + table.height)).toBeLessThan(40);
+});
