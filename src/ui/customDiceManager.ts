@@ -3,12 +3,15 @@ import {
   MAX_FACE_LENGTH,
   MAX_NAME_LENGTH,
   createCustomDie,
+  parseFace,
   toCustomDieInput,
   validateCustomDie,
   type ValidationError,
 } from '../core/customDice';
-import type { DieDefinition } from '../core/dice';
+import { shapeForFaceCount, type DieDefinition } from '../core/dice';
+import { DEFAULT_STYLE, sameStyle } from '../core/diceStyle';
 import { closeDialog, openDialog } from './dialog';
+import { createStyleEditor, type CreatePreview } from './styleEditor';
 import { el } from './views';
 
 export interface CustomDiceManagerOptions {
@@ -17,6 +20,8 @@ export interface CustomDiceManagerOptions {
   /** Called with a new or edited die (an edited die keeps its id). */
   onSave(die: DieDefinition): void;
   onDelete(id: string): void;
+  /** Creates the 3D preview in the editor; omit for none. */
+  readonly createPreview?: CreatePreview | undefined;
 }
 
 export interface CustomDiceManager {
@@ -73,6 +78,9 @@ export function createCustomDiceManager(
         <ol class="editor__faces"></ol>
         <p class="field__error" id="faces-error"></p>
       </fieldset>
+      <fieldset class="editor__look">
+        <legend class="field__label">Look</legend>
+      </fieldset>
       <div class="editor__actions">
         <button type="submit" class="btn btn--primary">Save</button>
         <button type="button" class="btn" data-action="cancel-edit">Cancel</button>
@@ -94,6 +102,13 @@ export function createCustomDiceManager(
   const countSelect = q<HTMLSelectElement>('#die-count');
   const facesList = q<HTMLElement>('.editor__faces');
   const facesError = q<HTMLElement>('#faces-error');
+
+  const look = createStyleEditor({
+    idPrefix: 'die-style',
+    createPreview: options.createPreview,
+    onChange: () => updatePreview(),
+  });
+  q('.editor__look').append(look.element);
 
   let editingId: string | null = null;
   let opener: HTMLElement | null = null;
@@ -125,6 +140,20 @@ export function createCustomDiceManager(
     );
   }
 
+  /** The die as currently typed in, for the preview (even if not valid yet). */
+  function updatePreview(): void {
+    const labels = faceInputs().map((i) => i.value);
+    const shape = shapeForFaceCount(labels.length);
+    if (!shape) return;
+    look.setPreviewDie({
+      id: editingId ?? 'preview',
+      name: nameInput.value,
+      shape,
+      faces: labels.map(parseFace),
+      custom: true,
+    });
+  }
+
   function clearErrors(): void {
     nameError.textContent = '';
     facesError.textContent = '';
@@ -153,6 +182,7 @@ export function createCustomDiceManager(
 
   /** Shows the list, focusing the Edit button of die `focusId` if given, else New custom die. */
   function showList(focusId: string | null = null): void {
+    look.stop();
     form.hidden = true;
     listView.hidden = false;
     editingId = null;
@@ -169,9 +199,12 @@ export function createCustomDiceManager(
     formTitle.textContent = die ? `Edit ${die.name}` : 'New custom die';
     nameInput.value = input?.name ?? '';
     setFaceCount(input?.faces.length ?? DEFAULT_FACE_COUNT, input?.faces ?? []);
+    look.setStyle(die?.style ?? DEFAULT_STYLE);
     clearErrors();
     listView.hidden = true;
     form.hidden = false;
+    look.start();
+    updatePreview();
     nameInput.focus();
   }
 
@@ -256,11 +289,21 @@ export function createCustomDiceManager(
     showList(editingId);
   });
   q('[data-action="close-manager"]').addEventListener('click', () => closeDialog(dialog));
-  countSelect.addEventListener('change', () => setFaceCount(Number(countSelect.value)));
+  countSelect.addEventListener('change', () => {
+    setFaceCount(Number(countSelect.value));
+    updatePreview();
+  });
+  facesList.addEventListener('change', updatePreview);
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const input = { name: nameInput.value, faces: faceInputs().map((i) => i.value) };
+    // The default look is not stored, so plain dice stay as they were.
+    const style = sameStyle(look.style, DEFAULT_STYLE) ? undefined : look.style;
+    const input = {
+      name: nameInput.value,
+      faces: faceInputs().map((i) => i.value),
+      ...(style ? { style } : {}),
+    };
     const otherNames = options
       .getDice()
       .filter((d) => d.id !== editingId)
@@ -276,6 +319,7 @@ export function createCustomDiceManager(
   });
 
   dialog.addEventListener('close', () => {
+    look.stop();
     form.hidden = true;
     listView.hidden = false;
     editingId = null;
