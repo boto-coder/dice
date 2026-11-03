@@ -31,7 +31,7 @@ test('every control can be reached with Tab, in a sensible order', async ({ page
   if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
 
   // Start at the first control, then walk forward with Tab.
-  await page.getByRole('button', { name: 'Add d4 to tray' }).focus();
+  await page.getByRole('button', { name: 'Appearance' }).focus();
   const names: string[] = [await focusedName(page)];
   for (let i = 0; i < 25; i++) {
     const before = await page.evaluateHandle(() => document.activeElement);
@@ -46,6 +46,7 @@ test('every control can be reached with Tab, in a sensible order', async ({ page
     names.push(await focusedName(page));
   }
   expect(names).toEqual([
+    'Appearance',
     'Add d4 to tray',
     'Add d6 to tray',
     'Add d8 to tray',
