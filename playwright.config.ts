@@ -1,15 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Firefox and WebKit (Safari's engine) are opt-in: `npm run test:firefox` and
-// `npm run test:webkit`. They need `npx playwright install firefox webkit` once;
-// WebKit also needs system libraries that Playwright only installs on
-// Ubuntu/Debian (`npx playwright install-deps`) and macOS.
+// Firefox is opt-in (`npm run test:firefox`); it needs
+// `npx playwright install firefox` once.
 const otherBrowsers = process.env.ALL_BROWSERS
-  ? [
-      { name: 'desktop-firefox', use: { ...devices['Desktop Firefox'] } },
-      { name: 'desktop-webkit', use: { ...devices['Desktop Safari'] } },
-      { name: 'mobile-webkit', use: { ...devices['iPhone 14'] } },
-    ]
+  ? [{ name: 'desktop-firefox', use: { ...devices['Desktop Firefox'] } }]
   : [];
 
 // BASE_PATH=/dice/ tests the build exactly as it is served on GitHub Pages.
