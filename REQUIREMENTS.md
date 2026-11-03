@@ -81,7 +81,7 @@ _Status: v1 · Last updated: 2026-11-03_
 - A style has:
   - a **body colour**;
   - a **label colour** (numbers and text), chosen automatically for contrast or set by the user, with a warning when it would be hard to read;
-  - a **pattern** drawn behind the labels. Proposed: solid, marble, speckled, two-colour swirl, stripes, gradient (to be confirmed);
+  - a **pattern** drawn behind the labels. one of solid, marble, speckled, two-colour swirl, stripes, or gradient;
   - a **finish**: matte, glossy, or metallic.
 - Ready-made presets (e.g. Ivory, Obsidian, Ruby marble, Ocean speckle, Gold) plus free choice.
 - An **Appearance** dialog with a live 3D preview of the die being styled.
@@ -161,7 +161,6 @@ _Status: v1 · Last updated: 2026-11-03_
 ## 7. Open Questions
 
 - **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors). Partly answered: dark theme (milestone 10) and dice styles (milestone 11).
-- **Dice patterns:** Confirm the pattern list in 3.5 (or add looks such as glitter, wood, stone).
 
 ## 8. Milestones
 
