@@ -1,6 +1,6 @@
 # Dice Roller Web App — Requirements
 
-_Status: Draft v1 · Last updated: 2026-10-31_
+_Status: v1 · Last updated: 2026-11-03_
 
 ## 1. Overview
 
@@ -31,7 +31,6 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - Persisted roll history
 - Backend / user accounts / multiplayer sync
 - Native mobile apps
-- Public hosting (runs locally for now)
 
 ## 3. Functional Requirements
 
@@ -118,7 +117,7 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 - **Architecture:** Keep pure logic (dice definitions, face reading, tray, results, history, storage) separate from rendering. That way the logic and physics can be tested in Node without a browser.
 - **Persistence:** `localStorage` for custom dice only, stored as versioned JSON.
 - **Backend:** None.
-- **Hosting:** Run locally for now (`vite dev` / `vite preview`). See Open Questions.
+- **Hosting:** GitHub Pages at https://boto-coder.github.io/dice/ (decided in milestone 9). A GitHub Actions workflow runs the full test suite on every push to `master` and publishes only the built app if it passes. Source: public GitHub repo `boto-coder/dice`; Entire session checkpoints are kept in a separate private Entire repo and never pushed to GitHub.
 
 ### 6.1 Testing (full suite)
 
@@ -147,7 +146,6 @@ _Status: Draft v1 · Last updated: 2026-10-31_
 
 ## 7. Open Questions
 
-- **Hosting:** Where should it eventually be deployed (GitHub Pages, Netlify, own server, …)?
 - **Visual style:** Revisit look & feel after the first working version (table surface, dice materials, colors).
 - **Theme:** Light, dark, or follow the system setting?
 
