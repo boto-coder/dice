@@ -25,7 +25,7 @@ async function rollAndRead(page: Page): Promise<string> {
 }
 
 test('creates, rolls, keeps, edits, and deletes a custom die', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await createDie(page, 'Combat', COMBAT_FACES);
   const dialog = page.getByRole('dialog', { name: 'Custom dice' });
   await expect(dialog).toContainText('d6 · ⚔️ ⚔️ 🛡️ 🛡️ 💀 –');
@@ -64,7 +64,7 @@ test('creates, rolls, keeps, edits, and deletes a custom die', async ({ page }) 
 });
 
 test('rolls a custom number die on every custom shape, summing it', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   // A d4-shaped die (read by its top corner) and a d20-shaped die with text.
   await createDie(page, 'Pips', ['1', '1', '2', '3']);
   await page.keyboard.press('Escape');
@@ -81,7 +81,7 @@ test('rolls a custom number die on every custom shape, summing it', async ({ pag
 });
 
 test('shows validation errors in the editor', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Manage' }).click();
   const dialog = page.getByRole('dialog', { name: 'Custom dice' });
   await dialog.getByRole('button', { name: 'New custom die' }).click();
@@ -92,7 +92,7 @@ test('shows validation errors in the editor', async ({ page }) => {
 });
 
 test('the custom dice dialog has no detectable accessibility violations', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await createDie(page, 'Combat', COMBAT_FACES);
   const dialog = page.getByRole('dialog', { name: 'Custom dice' });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
