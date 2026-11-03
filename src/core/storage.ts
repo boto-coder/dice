@@ -1,18 +1,23 @@
 import { createCustomDie } from './customDice';
 import type { DieDefinition } from './dice';
+import { parseStyle, type DiceStyle } from './diceStyle';
 
 export const STORAGE_KEY = 'dice-roller:custom-dice';
-export const STORAGE_VERSION = 1;
+/** Version 2 added an optional style per die; version 1 data still loads. */
+export const STORAGE_VERSION = 2;
+const READABLE_VERSIONS: readonly unknown[] = [1, 2];
 
-interface StoredDieV1 {
+interface StoredDie {
   id: string;
   name: string;
   faces: string[];
+  /** Version 2 only. */
+  style?: DiceStyle;
 }
 
-interface StoredDataV1 {
-  version: 1;
-  dice: StoredDieV1[];
+interface StoredData {
+  version: 2;
+  dice: StoredDie[];
 }
 
 export interface LoadResult {
@@ -25,7 +30,7 @@ function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
-function isStoredDie(x: unknown): x is StoredDieV1 {
+function isStoredDie(x: unknown): x is StoredDie {
   return (
     isRecord(x) &&
     typeof x.id === 'string' &&
@@ -53,7 +58,7 @@ export function loadCustomDice(storage: Pick<Storage, 'getItem'>): LoadResult {
     return { dice: [], warnings: ['Saved dice could not be read (corrupt data).'] };
   }
 
-  if (!isRecord(data) || data.version !== STORAGE_VERSION || !Array.isArray(data.dice)) {
+  if (!isRecord(data) || !READABLE_VERSIONS.includes(data.version) || !Array.isArray(data.dice)) {
     return { dice: [], warnings: ['Saved dice are in an unknown format and were ignored.'] };
   }
 
@@ -70,9 +75,14 @@ export function loadCustomDice(storage: Pick<Storage, 'getItem'>): LoadResult {
       warnings.push(`Saved die "${entry.name}" is a duplicate and was skipped.`);
       return;
     }
+    let style: DiceStyle | undefined;
+    if (entry.style !== undefined) {
+      style = parseStyle(entry.style) ?? undefined;
+      if (!style) warnings.push(`The look of saved die "${entry.name}" was invalid and was reset.`);
+    }
     try {
       const die = createCustomDie(
-        { name: entry.name, faces: entry.faces },
+        { name: entry.name, faces: entry.faces, ...(style ? { style } : {}) },
         { id: entry.id, otherNames: dice.map((d) => d.name) },
       );
       ids.add(die.id);
@@ -92,11 +102,16 @@ export function saveCustomDice(
   storage: Pick<Storage, 'setItem'>,
   dice: readonly DieDefinition[],
 ): boolean {
-  const data: StoredDataV1 = {
+  const data: StoredData = {
     version: STORAGE_VERSION,
     dice: dice
       .filter((d) => d.custom)
-      .map((d) => ({ id: d.id, name: d.name, faces: d.faces.map((f) => f.label) })),
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        faces: d.faces.map((f) => f.label),
+        ...(d.style ? { style: d.style } : {}),
+      })),
   };
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(data));
