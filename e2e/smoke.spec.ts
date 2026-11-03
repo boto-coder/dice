@@ -127,6 +127,6 @@ test('keeps the controls under the table when the history is long', async ({ pag
   await expect(page.locator('.history__entry')).toHaveCount(20);
 
   const table = (await page.getByRole('region', { name: 'Dice table' }).boundingBox())!;
-  const diceBar = (await page.getByRole('group', { name: 'Add dice' }).boundingBox())!;
-  expect(diceBar.y - (table.y + table.height)).toBeLessThan(40);
+  const dice = (await page.getByRole('region', { name: 'Dice', exact: true }).boundingBox())!;
+  expect(dice.y - (table.y + table.height)).toBeLessThan(40);
 });
