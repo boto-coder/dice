@@ -5,6 +5,7 @@ import {
   type DieDefinition,
   type Face,
 } from './dice';
+import type { DiceStyle } from './diceStyle';
 import { randomId } from './random';
 
 export const MAX_NAME_LENGTH = 30;
@@ -16,6 +17,8 @@ export interface CustomDieInput {
   readonly name: string;
   /** Face labels. An empty string is a blank face. */
   readonly faces: readonly string[];
+  /** How the die looks; omitted means the default style. */
+  readonly style?: DiceStyle;
 }
 
 export interface ValidationError {
@@ -101,10 +104,15 @@ export function createCustomDie(
     shape: shapeForFaceCount(input.faces.length)!,
     faces: input.faces.map(parseFace),
     custom: true,
+    ...(input.style ? { style: input.style } : {}),
   };
 }
 
 /** Converts a die back into editable input (e.g. to prefill the editor). */
 export function toCustomDieInput(die: DieDefinition): CustomDieInput {
-  return { name: die.name, faces: die.faces.map((f) => f.label) };
+  return {
+    name: die.name,
+    faces: die.faces.map((f) => f.label),
+    ...(die.style ? { style: die.style } : {}),
+  };
 }
