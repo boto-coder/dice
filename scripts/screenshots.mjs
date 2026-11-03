@@ -6,6 +6,7 @@
 // to the tray before rolling. Each --custom seeds a saved custom die.
 // Steps: 1-initial, 2-tray (dice added), 3-rolling, 4-result (full page);
 // with custom dice also 5-manager and 6-editor.
+// --theme dark|light|system seeds the saved theme (the app's default is dark).
 import { chromium, devices } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
@@ -15,6 +16,12 @@ for (let i = args.indexOf('--custom'); i >= 0; i = args.indexOf('--custom')) {
   const [name, faces = ''] = args[i + 1].split('=');
   custom.push({ id: `custom-shot-${custom.length}`, name, faces: faces.split('|') });
   args.splice(i, 2);
+}
+let theme = null;
+const themeAt = args.indexOf('--theme');
+if (themeAt >= 0) {
+  theme = args[themeAt + 1];
+  args.splice(themeAt, 2);
 }
 const label = args[0] ?? 'snapshot';
 const baseUrl = args[1] ?? 'http://127.0.0.1:5173';
@@ -35,6 +42,14 @@ for (const { name, context } of targets) {
     await page.addInitScript((value) => {
       localStorage.setItem('dice-roller:custom-dice', value);
     }, stored);
+  }
+  if (theme) {
+    await page.addInitScript(
+      (value) => {
+        localStorage.setItem('dice-roller:settings', value);
+      },
+      JSON.stringify({ version: 1, theme }),
+    );
   }
   await page.goto(baseUrl);
   await page.waitForSelector('canvas');
